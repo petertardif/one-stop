@@ -217,19 +217,20 @@ Organized repository of critical information:
 ## Data Models (PostgreSQL)
 
 ```
-users               id, email, password_hash, role (admin|spouse), created_at
-accounts            id, user_id (FK), name, institution, type, balance, currency, plaid_account_id (nullable), last_synced_at, created_at
-transactions        id, user_id (FK), account_id (FK), amount, type (income|expense), category, description, date, created_at
-plaid_items         id, user_id (FK), access_token, institution_name, created_at
-stocks              id, ticker, company_name, sector, created_at
-watchlist_entries   id, user_id (FK), stock_id (FK), sticker_price, mos_price, growth_rate_used, big5_data (jsonb), added_at
-four_ms_entries     id, watchlist_entry_id (FK), meaning_notes, moat_type, moat_notes, management_notes, mos_notes, updated_at
-research_notes      id, watchlist_entry_id (FK), content (text), updated_at
-too_hard_entries    id, user_id (FK), ticker, company_name, reason (text), dismissed_at
-checklist_items     id, category, sort_order, title, description, created_by (FK users), updated_at
-checklist_progress  id, item_id (FK), user_id (FK), completed, notes, completed_at
+users               id, email, password_hash, role (admin|spouse), created_at, updated_at
+user_profiles       id, user_id (FK), first_name, last_name, date_of_birth, phone, address_line1, address_line2, city, state, postal_code, country, created_at, updated_at
+accounts            id, user_id (FK), name, institution, type, balance, currency, plaid_account_id (nullable), last_synced_at, created_at, updated_at
+transactions        id, user_id (FK), account_id (FK), amount, type (income|expense), category, description, date, created_at, updated_at
+plaid_items         id, user_id (FK), access_token, institution_name, created_at, updated_at
+stocks              id, ticker, company_name, sector, created_at, updated_at
+watchlist_entries   id, user_id (FK), stock_id (FK), sticker_price, mos_price, growth_rate_used, big5_data (jsonb), added_at, updated_at
+four_ms_entries     id, watchlist_entry_id (FK), meaning_notes, moat_type, moat_notes, management_notes, mos_notes, created_at, updated_at
+research_notes      id, watchlist_entry_id (FK), content (text), created_at, updated_at
+too_hard_entries    id, user_id (FK), ticker, company_name, reason (text), dismissed_at, updated_at
+checklist_items     id, category, sort_order, title, description, created_by (FK users), created_at, updated_at
+checklist_progress  id, item_id (FK), user_id (FK), completed, notes, completed_at, updated_at
 vault_entries       id, category, title, fields (jsonb), last_verified_at, created_at, updated_at
-contacts            id, name, role, firm, phone, email, notes, created_at
+contacts            id, name, role, firm, phone, email, notes, created_at, updated_at
 ```
 
 ---

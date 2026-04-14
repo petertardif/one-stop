@@ -1,5 +1,9 @@
 # Project: One Stop
 
+We are building the app described in @SPEC.md In additio to this file, read that file for general architectural tasks or to double check the exact database structure, tech-stack, or application architecture. Update this file and @SPEC.md anytime new features are created.
+
+Keep your replies extremely concise and focus on conveying the key information. No unnecessary fluff and no long code snippets. 
+
 Next.js 14 application with App Router, TypeScript, and vanilla CSS.
 
 ## Tech Stack
