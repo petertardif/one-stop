@@ -51,7 +51,9 @@ export function RegisterForm({ token, emailHint }: Props) {
       return
     }
 
-    router.push('/login')
+    const data = await res.json()
+    const next = encodeURIComponent(data.next ?? '/dashboard')
+    router.push(`/login?next=${next}`)
   }
 
   return (

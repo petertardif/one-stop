@@ -34,12 +34,18 @@ export async function POST(req: NextRequest) {
 
   const passwordHash = await bcrypt.hash(password, 12)
 
-  await query(
-    `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3)`,
+  const userResult = await query<{ id: string }>(
+    `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id`,
     [email.toLowerCase(), passwordHash, inviteToken.role]
+  )
+
+  // Create an empty profile row so dashboard can show name once filled in
+  await query(
+    `INSERT INTO user_profiles (user_id) VALUES ($1)`,
+    [userResult.rows[0].id]
   )
 
   await consumeInviteToken(token)
 
-  return NextResponse.json({ message: 'Account created' }, { status: 201 })
+  return NextResponse.json({ message: 'Account created', next: '/settings/profile' }, { status: 201 })
 }

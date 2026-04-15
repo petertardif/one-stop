@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { emailHint } = parsed.data
-  const token = await createInviteToken(session.user.id, 'spouse', emailHint)
+  const token = await createInviteToken(session.user.id, 'partner', emailHint)
 
   const hint = emailHint ? `&hint=${encodeURIComponent(emailHint)}` : ''
   const inviteUrl = `${process.env.NEXTAUTH_URL}/register?token=${token}${hint}`

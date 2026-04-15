@@ -37,7 +37,7 @@ describe('POST /api/auth/invite', () => {
 
   it('returns 401 when authenticated as spouse', async () => {
     mockGetSession.mockResolvedValueOnce({
-      user: { id: 'u1', email: 'spouse@b.com', role: 'spouse' },
+      user: { id: 'u1', email: 'spouse@b.com', role: 'partner' },
     } as never)
 
     const res = await POST(makeRequest({}))

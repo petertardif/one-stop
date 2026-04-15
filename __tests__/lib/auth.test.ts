@@ -92,9 +92,9 @@ describe('JWT and session callbacks', () => {
   })
 
   it('jwt callback returns token unchanged when no user (token refresh)', async () => {
-    const token = { id: 'u1', role: 'spouse' as const } as never
+    const token = { id: 'u1', role: 'partner' as const } as never
     const result = await jwtCallback({ token, user: undefined } as never)
-    expect(result).toMatchObject({ id: 'u1', role: 'spouse' })
+    expect(result).toMatchObject({ id: 'u1', role: 'partner' })
   })
 
   it('session callback copies id and role from token onto session.user', async () => {

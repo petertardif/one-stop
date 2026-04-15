@@ -7,13 +7,13 @@ interface UserRow {
   id: string
   email: string
   password_hash: string
-  role: 'admin' | 'spouse'
+  role: 'admin' | 'partner' | 'dependent'
 }
 
 export async function authorizeUser(
   email: string,
   password: string
-): Promise<{ id: string; email: string; role: 'admin' | 'spouse' } | null> {
+): Promise<{ id: string; email: string; role: 'admin' | 'partner' | 'dependent' } | null> {
   const result = await query<UserRow>(
     'SELECT id, email, password_hash, role FROM users WHERE email = $1',
     [email.toLowerCase()]

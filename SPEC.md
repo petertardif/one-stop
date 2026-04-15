@@ -2,7 +2,7 @@
 
 ## Context
 
-"One Stop" is a private, family-focused financial hub built on an existing Next.js 14 + PostgreSQL scaffold. The goal is to consolidate everything related to the family's financial life into a single trusted app: live account balances, investing research, and a contingency guide for the spouse. The app needs two distinct user roles (admin and spouse/read-only), manual data entry plus optional Plaid bank sync, and three core feature areas.
+"One Stop" is a private, family-focused financial hub built on an existing Next.js 14 + PostgreSQL scaffold. The goal is to consolidate everything related to the family's financial life into a single trusted app: live account balances, investing research, and a contingency guide for the partner. The app needs three distinct user roles (admin, partner, and dependent), manual data entry plus optional Plaid bank sync, and three core feature areas.
 
 ---
 
@@ -11,7 +11,8 @@
 | Role | Access |
 |------|--------|
 | **Admin** (primary user) | Full read/write across all sections |
-| **Spouse** | Read-only on Dashboard & "In Case I Die"; no access to investing research by default (configurable) |
+| **Partner** | Read-only on Dashboard & "In Case I Die"; access to investing research by default (configurable); some write access for specific sections (configurable) |
+| **Dependent** | Read-only on Dashboard & "In Case I Die"; access to investing research by default (configurable); some write access for specific sections (configurable) |
 
 Authentication: email + password, JWT sessions via NextAuth.js. Role is stored on the user record in the database.
 
@@ -22,7 +23,7 @@ Authentication: email + password, JWT sessions via NextAuth.js. Role is stored o
 ### 1. Authentication (`/app/(auth)`)
 
 - Sign-in page (`/login`)
-- Invite-only registration (admin sends invite link to spouse)
+- Invite-only registration (admin sends invite link to partner or dependent)
 - No public sign-up
 - Session stored in HTTP-only cookie via NextAuth
 - Middleware (`middleware.ts`) protects all routes; redirects unauthenticated users to `/login`
@@ -72,9 +73,52 @@ The primary landing page after login. Provides an at-a-glance view of the family
 
 ---
 
-### 3. Rule #1 Investing (`/app/investing`)
+### 3. Monthly Budget / Ledger (`/app/monthly`)
 
-Research hub built around Phil Town's Rule #1 / value investing methodology. Accessible to Admin; optionally visible to Spouse (admin-configurable).
+A full transaction ledger showing credits and debits from the family's checking account and credit cards. Transactions are pulled from Plaid-connected accounts and stored locally. Manual entries (not tied to any bank account) can also be added.
+
+**Period selector** — toggleable filter:
+- All time
+- Individual year (dynamically generated from existing data)
+- Last 6 months
+- Last 3 months
+- Individual month (with prev/next navigation)
+
+**Account filter** — tabs for All / Checking / each credit card account.
+
+**Transaction table columns:**
+
+| Column | Notes |
+|--------|-------|
+| Date | Editable date picker |
+| ✓ | Posted indicator (checkbox) |
+| Check # | Optional, for paper checks |
+| Category | Dropdown (predefined family categories) |
+| Description | Editable text |
+| Amount | Positive = credit (green), negative = debit (red) |
+| Balance | Running balance computed client-side |
+| Budget | Flag checkbox (tracks budget-relevant entries) |
+| Notes | Editable free text |
+| Source | Account name (shown in "All" view) |
+
+**Edit behavior:** Click a row to edit in-place. Save on Enter/blur, cancel on Escape.
+
+**Plaid sync:** "Sync Plaid" button calls `/api/plaid/sync`. Plaid transactions cannot be deleted (only edited). Manual transactions can be deleted.
+
+**Categories:** FINANCIAL, MONTHLY BILLS, ENTERTAINMENT, GROCERIES, HOUSE, CAR, HEALTHCARE, KIDS, DOGS, TRAVEL, SHOPPING, ALCOHOL, RESTAURANT, TAKEOUT, GAS, GIFTS, KIDS SPORTS, JOB RELATED, XMAS, INCOME, OTHER
+
+**API routes:**
+- `GET /api/transactions?period=YYYY-MM&account_id=...` — fetch filtered transactions
+- `POST /api/transactions` — create manual transaction
+- `PUT /api/transactions/[id]` — update any field except `plaid_transaction_id`
+- `DELETE /api/transactions/[id]` — delete (manual only)
+- `POST /api/plaid/link-token` — create Plaid Link token
+- `POST /api/plaid/exchange-token` — exchange public token, store access token, create account records
+- `POST /api/plaid/sync` — pull 90 days of transactions from Plaid, upsert by `plaid_transaction_id`
+
+### 4. Rule #1 Investing (`/app/investing`)
+
+Research hub built around Phil Town's Rule #1 / value investing methodology. Accessible to Admin; optionally visible to Partner/Dependent (admin-configurable).
 
 #### Big 5 Numbers Calculator (`/investing/calculator`)
 
@@ -160,9 +204,9 @@ A log of stocks the user has researched and consciously passed on, so they are n
 
 ---
 
-### 4. In Case I Die (`/app/contingency`)
+### 5. In Case I Die (`/app/contingency`)
 
-A secure, compassionate guide for the spouse to follow if the primary user dies. Read-only for Spouse role; fully editable by Admin.
+A secure, compassionate guide for the partner to follow if the primary user dies. Read-only for Partner and Dependent roles; fully editable by Admin.
 
 #### Step-by-Step Checklist (`/contingency/checklist`)
 
@@ -189,7 +233,7 @@ Interactive checklist organized by timeline:
   - Review budget and cash flow
   - Meet with financial advisor
 
-Each checklist item: checkbox (Spouse can check off items to track progress), notes field, attached document or link.
+Each checklist item: checkbox (Partner/Dependent can check off items to track progress), notes field, attached document or link.
 
 Admin can add, edit, reorder, or remove checklist items.
 
@@ -217,11 +261,11 @@ Organized repository of critical information:
 ## Data Models (PostgreSQL)
 
 ```
-users               id, email, password_hash, role (admin|spouse), created_at, updated_at
+users               id, email, password_hash, role (admin|partner|dependent), created_at, updated_at
 user_profiles       id, user_id (FK), first_name, last_name, date_of_birth, phone, address_line1, address_line2, city, state, postal_code, country, created_at, updated_at
-accounts            id, user_id (FK), name, institution, type, balance, currency, plaid_account_id (nullable), last_synced_at, created_at, updated_at
-transactions        id, user_id (FK), account_id (FK), amount, type (income|expense), category, description, date, created_at, updated_at
-plaid_items         id, user_id (FK), access_token, institution_name, created_at, updated_at
+plaid_items         id, user_id (FK), access_token, item_id (unique), institution_name, created_at, updated_at
+accounts            id, user_id (FK), name, institution, type (checking|savings|investment|brokerage|retirement|real_estate|credit_card|mortgage|car_loan|student_loan|other_debt), balance, currency, plaid_account_id (nullable, unique), plaid_item_id (FK nullable), last_synced_at, created_at, updated_at
+transactions        id, user_id (FK), account_id (FK nullable), plaid_transaction_id (nullable, unique), is_manual, amount, type (income|expense), category, description, check_number (nullable), date, is_posted, budget_flagged, notes, created_at, updated_at
 stocks              id, ticker, company_name, sector, created_at, updated_at
 watchlist_entries   id, user_id (FK), stock_id (FK), sticker_price, mos_price, growth_rate_used, big5_data (jsonb), added_at, updated_at
 four_ms_entries     id, watchlist_entry_id (FK), meaning_notes, moat_type, moat_notes, management_notes, mos_notes, created_at, updated_at
@@ -256,7 +300,9 @@ contacts            id, name, role, firm, phone, email, notes, created_at, updat
 /contingency/vault/[category]
 /contingency/print
 
-/settings                    (admin only — invite spouse, manage roles, Plaid setup)
+/monthly
+
+/settings                    (admin only — invite partner/dependent, manage roles, Plaid setup)
 ```
 
 ---
@@ -277,14 +323,14 @@ contacts            id, name, role, firm, phone, email, notes, created_at, updat
 1. **Auth** — NextAuth setup, user table, login page, middleware
 2. **Dashboard** — Account CRUD, manual balance entry, net worth calculation, basic charts
 3. **Plaid** — Link widget, token storage, balance sync
-4. **Contingency** — Checklist + vault (highest value for spouse use case)
+4. **Contingency** — Checklist + vault (highest value for partner use case)
 5. **Investing** — Big 5 calculator, sticker price, watchlist, 4Ms, technical indicators, Too Hard pile
 
 ---
 
 ## Verification Checklist
 
-- [ ] Admin can log in and see dashboard; spouse sees read-only view
+- [ ] Admin can log in and see dashboard; partner/dependent sees read-only view
 - [ ] Adding/editing an account updates net worth total on dashboard
 - [ ] Plaid link flow connects an account and syncs balance
 - [ ] Big 5 calculator fetches real financial data and calculates rates correctly
@@ -295,7 +341,7 @@ contacts            id, name, role, firm, phone, email, notes, created_at, updat
 - [ ] Stochastic crossover buy/sell signals render at correct price points
 - [ ] "Move to Too Hard" removes stock from watchlist and logs it with date + reason
 - [ ] Too Hard pile is searchable; stocks can be restored to watchlist
-- [ ] Spouse can view contingency checklist and check off items
+- [ ] Partner/Dependent can view contingency checklist and check off items
 - [ ] Vault entries display all fields; no plaintext passwords accepted
 - [ ] Print view renders cleanly
 - [ ] All routes redirect unauthenticated users to /login

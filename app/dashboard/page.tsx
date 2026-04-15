@@ -20,11 +20,11 @@ export default async function DashboardPage() {
   if (!session) redirect('/login')
 
   const firstName = await getFirstName(session.user.id)
-  const displayName = firstName ?? session.user.email
+  if (!firstName) redirect('/settings/profile')
 
   return (
     <main>
-      <h1>Welcome, {displayName}</h1>
+      <h1>Welcome, {firstName}</h1>
     </main>
   )
 }

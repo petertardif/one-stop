@@ -6,20 +6,20 @@ declare module 'next-auth' {
     user: {
       id: string
       email: string
-      role: 'admin' | 'spouse'
+      role: 'admin' | 'partner' | 'dependent'
     }
   }
 
   interface User {
     id: string
     email: string
-    role: 'admin' | 'spouse'
+    role: 'admin' | 'partner' | 'dependent'
   }
 }
 
 declare module 'next-auth/jwt' {
   interface JWT {
     id: string
-    role: 'admin' | 'spouse'
+    role: 'admin' | 'partner' | 'dependent'
   }
 }

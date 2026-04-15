@@ -12,7 +12,7 @@ CREATE TABLE users (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email         TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
-  role          TEXT NOT NULL CHECK (role IN ('admin', 'spouse')),
+  role          TEXT NOT NULL CHECK (role IN ('admin', 'partner', 'dependent')),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -26,7 +26,7 @@ CREATE TABLE invite_tokens (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   token       TEXT NOT NULL UNIQUE,
   invited_by  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  role        TEXT NOT NULL DEFAULT 'spouse' CHECK (role IN ('admin', 'spouse')),
+  role        TEXT NOT NULL DEFAULT 'partner' CHECK (role IN ('admin', 'partner', 'dependent')),
   email_hint  TEXT,
   used_at     TIMESTAMPTZ,
   expires_at  TIMESTAMPTZ NOT NULL,
