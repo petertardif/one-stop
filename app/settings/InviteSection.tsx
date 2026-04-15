@@ -82,7 +82,7 @@ export function InviteSection({ pendingInvites }: { pendingInvites: PendingInvit
           <input
             id="emailHint"
             type="email"
-            placeholder="spouse@example.com"
+            placeholder="partner@example.com"
             {...register('emailHint')}
           />
           {errors.emailHint && (

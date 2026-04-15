@@ -38,19 +38,19 @@ describe('createInviteToken', () => {
   it('inserts a token row and returns the token string', async () => {
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
 
-    const token = await createInviteToken('user-id-123', 'spouse', 'test@example.com')
+    const token = await createInviteToken('user-id-123', 'partner', 'test@example.com')
 
     expect(token).toHaveLength(64)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO invite_tokens'),
-      expect.arrayContaining(['user-id-123', 'spouse', 'test@example.com'])
+      expect.arrayContaining(['user-id-123', 'partner', 'test@example.com'])
     )
   })
 
   it('passes null email_hint when not provided', async () => {
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
 
-    await createInviteToken('user-id-123', 'spouse')
+    await createInviteToken('user-id-123', 'partner')
 
     expect(mockQuery).toHaveBeenCalledWith(
       expect.any(String),
@@ -61,7 +61,7 @@ describe('createInviteToken', () => {
 
 describe('validateInviteToken', () => {
   it('returns the token row when valid', async () => {
-    const fakeRow = { id: 'tok-1', token: 'abc', invited_by: 'u1', role: 'spouse', email_hint: null, used_at: null, expires_at: new Date() }
+    const fakeRow = { id: 'tok-1', token: 'abc', invited_by: 'u1', role: 'partner', email_hint: null, used_at: null, expires_at: new Date() }
     mockQuery.mockResolvedValueOnce({ rows: [fakeRow], rowCount: 1 } as never)
 
     const result = await validateInviteToken('abc')

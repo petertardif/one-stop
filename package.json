@@ -18,6 +18,7 @@
     "next-auth": "^4.24.13",
     "nodemailer": "^7.0.13",
     "pg": "^8.0.0",
+    "plaid": "^41.4.0",
     "react": "^18",
     "react-dom": "^18",
     "react-hook-form": "^7.0.0",

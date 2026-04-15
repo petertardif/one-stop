@@ -24,7 +24,7 @@ function makeRequest(body: unknown) {
   })
 }
 
-const validToken = { id: 't1', token: 'abc', invited_by: 'admin', role: 'spouse' as const, email_hint: null, used_at: null, expires_at: new Date() }
+const validToken = { id: 't1', token: 'abc', invited_by: 'admin', role: 'partner' as const, email_hint: null, used_at: null, expires_at: new Date() }
 
 beforeEach(() => jest.clearAllMocks())
 
@@ -60,7 +60,8 @@ describe('POST /api/auth/register', () => {
     mockValidate.mockResolvedValueOnce(validToken)
     mockQuery
       .mockResolvedValueOnce({ rows: [], rowCount: 0 } as never) // email check
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 } as never) // insert user
+      .mockResolvedValueOnce({ rows: [{ id: 'new-user-id' }], rowCount: 1 } as never) // insert user
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 } as never) // insert profile
     mockHash.mockResolvedValueOnce('hashed-pw' as never)
     mockConsume.mockResolvedValueOnce(undefined)
 
@@ -70,7 +71,11 @@ describe('POST /api/auth/register', () => {
     expect(mockHash).toHaveBeenCalledWith('password123', 12)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO users'),
-      expect.arrayContaining(['new@b.com', 'hashed-pw', 'spouse'])
+      expect.arrayContaining(['new@b.com', 'hashed-pw', 'partner'])
+    )
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO user_profiles'),
+      ['new-user-id']
     )
     expect(mockConsume).toHaveBeenCalledWith('abc')
   })
@@ -79,6 +84,7 @@ describe('POST /api/auth/register', () => {
     mockValidate.mockResolvedValueOnce(validToken)
     mockQuery
       .mockResolvedValueOnce({ rows: [], rowCount: 0 } as never)
+      .mockResolvedValueOnce({ rows: [{ id: 'new-user-id' }], rowCount: 1 } as never)
       .mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
     mockHash.mockResolvedValueOnce('hashed-pw' as never)
     mockConsume.mockResolvedValueOnce(undefined)

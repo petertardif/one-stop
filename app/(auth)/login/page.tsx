@@ -6,10 +6,10 @@ import { LoginForm } from './LoginForm'
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: { message?: string }
+  searchParams: { message?: string; next?: string }
 }) {
   const session = await getServerSession(authOptions)
-  if (session) redirect('/dashboard')
+  if (session) redirect(searchParams.next ?? '/dashboard')
 
   return (
     <main className="auth-page">
@@ -18,7 +18,7 @@ export default async function LoginPage({
         {searchParams.message === 'password-updated' && (
           <p className="auth-success">Password updated. Please sign in.</p>
         )}
-        <LoginForm />
+        <LoginForm next={searchParams.next} />
         <a href="/forgot-password" className="auth-link">
           Forgot password?
         </a>
