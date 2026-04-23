@@ -103,7 +103,7 @@ A full transaction ledger showing credits and debits from the family's checking 
 
 **Edit behavior:** Click a row to edit in-place. Save on Enter/blur, cancel on Escape.
 
-**Plaid sync:** "Sync Plaid" button calls `/api/plaid/sync`. Plaid transactions cannot be deleted (only edited). Manual transactions can be deleted.
+**Plaid sync:** "Sync Accounts" button calls `/api/plaid/sync`. Plaid transactions cannot be deleted (only edited). Manual transactions can be deleted.
 
 **Categories:** FINANCIAL, MONTHLY BILLS, ENTERTAINMENT, GROCERIES, HOUSE, CAR, HEALTHCARE, KIDS, DOGS, TRAVEL, SHOPPING, ALCOHOL, RESTAURANT, TAKEOUT, GAS, GIFTS, KIDS SPORTS, JOB RELATED, XMAS, INCOME, OTHER
 
@@ -262,7 +262,7 @@ Organized repository of critical information:
 
 ```
 users               id, email, password_hash, role (admin|partner|dependent), created_at, updated_at
-user_profiles       id, user_id (FK), first_name, last_name, date_of_birth, phone, address_line1, address_line2, city, state, postal_code, country, created_at, updated_at
+user_profiles       id, user_id (FK), first_name, last_name, date_of_birth, phone, address_line1, address_line2, city, state, postal_code, country, avatar_url (nullable), created_at, updated_at
 plaid_items         id, user_id (FK), access_token, item_id (unique), institution_name, created_at, updated_at
 accounts            id, user_id (FK), name, institution, type (checking|savings|investment|brokerage|retirement|real_estate|credit_card|mortgage|car_loan|student_loan|other_debt), balance, currency, plaid_account_id (nullable, unique), plaid_item_id (FK nullable), last_synced_at, created_at, updated_at
 transactions        id, user_id (FK), account_id (FK nullable), plaid_transaction_id (nullable, unique), is_manual, amount, type (income|expense), category, description, check_number (nullable), date, is_posted, budget_flagged, notes, created_at, updated_at
@@ -312,6 +312,7 @@ contacts            id, name, role, firm, phone, email, notes, created_at, updat
 | Service | Purpose | Notes |
 |---------|---------|-------|
 | **Plaid** | Bank account sync | Server-side only; access tokens never sent to client |
+| **Avatar storage** | User profile photos | Stored on disk at `public/uploads/avatars/{userId}.ext`; path saved in `user_profiles.avatar_url`. To survive server migrations, move to object storage (S3 or Cloudflare R2): upload files to the bucket, store the public bucket URL in `avatar_url`, and remove the local `/api/profile/avatar` disk-write logic. |
 | **Financial Modeling Prep** (or Alpha Vantage) | Stock financial data for Big 5 calculator + OHLC price history for technical indicators | Free tier sufficient for personal use |
 | **Recharts** | Client-side chart rendering for MACD, Stochastic, and 10-day MA charts | React-native, TypeScript-friendly |
 | **NextAuth.js** | Authentication & session management | Credentials provider + JWT strategy |

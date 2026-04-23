@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import { ErrorMessage } from '@/components/ErrorMessage'
 
 const schema = z.object({
   email: z.string().email('Invalid email address'),
@@ -13,6 +14,12 @@ const schema = z.object({
 })
 
 type FormValues = z.infer<typeof schema>
+
+const ERROR_MESSAGES: Record<string, string> = {
+  ACCOUNT_LOCKED: 'This account has been locked due to too many failed attempts. Try again in 15 minutes.',
+  TOO_MANY_REQUESTS: 'Too many sign-in attempts from this device. Please wait 15 minutes and try again.',
+  INVALID_CREDENTIALS: 'Invalid email or password.',
+}
 
 export function LoginForm({ next }: { next?: string }) {
   const router = useRouter()
@@ -26,14 +33,26 @@ export function LoginForm({ next }: { next?: string }) {
 
   async function onSubmit(values: FormValues) {
     setAuthError(null)
+
+    let ip: string | undefined
+    try {
+      const res = await fetch('https://api.ipify.org?format=json')
+      const data = await res.json()
+      ip = data.ip
+    } catch {
+      // proceed without IP — server-side rate limiting will still work per-account
+    }
+
     const result = await signIn('credentials', {
       email: values.email,
       password: values.password,
+      ip: ip ?? '',
       redirect: false,
     })
 
     if (result?.error) {
-      setAuthError('Invalid email or password')
+      const code = result.error
+      setAuthError(ERROR_MESSAGES[code] ?? ERROR_MESSAGES.INVALID_CREDENTIALS)
       return
     }
 
@@ -54,7 +73,7 @@ export function LoginForm({ next }: { next?: string }) {
         {errors.password && <span className="field-error">{errors.password.message}</span>}
       </div>
 
-      {authError && <p className="auth-error">{authError}</p>}
+      {authError && <ErrorMessage message={authError} />}
 
       <button type="submit" disabled={isSubmitting} className="btn-primary">
         {isSubmitting ? 'Signing in…' : 'Sign in'}

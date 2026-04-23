@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import { query } from './db'
 
-export type Role = 'admin' | 'partner' | 'dependent'
+export type Role = 'admin' | 'partner_admin' | 'partner' | 'dependent'
 
 interface InviteTokenRow {
   id: string

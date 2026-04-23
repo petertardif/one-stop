@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useRouter } from 'next/navigation'
+import { ErrorMessage } from '@/components/ErrorMessage'
 
 const schema = z
   .object({
@@ -61,7 +62,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         )}
       </div>
 
-      {serverError && <p className="auth-error">{serverError}</p>}
+      {serverError && <ErrorMessage message={serverError} />}
 
       <button type="submit" disabled={isSubmitting} className="btn-primary">
         {isSubmitting ? 'Saving…' : 'Set new password'}

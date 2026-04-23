@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   let upserted = 0
 
-  for (const [access_token, accts] of byToken) {
+  for (const [access_token, accts] of Array.from(byToken)) {
     // Fetch 90 days of transactions
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - 90)
