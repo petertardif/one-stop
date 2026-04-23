@@ -1,0 +1,3 @@
+ALTER TABLE accounts
+  ADD COLUMN IF NOT EXISTS interest_rate NUMERIC(5,4),
+  ADD COLUMN IF NOT EXISTS minimum_payment NUMERIC(10,2);

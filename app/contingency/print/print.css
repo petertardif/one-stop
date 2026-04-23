@@ -1,0 +1,126 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: Georgia, 'Times New Roman', serif !important;
+  font-size: 12pt;
+  line-height: 1.6;
+  color: #1a1a1a;
+  background: #fff !important;
+}
+
+.print-toolbar {
+  background: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+  padding: 12px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-family: -apple-system, sans-serif;
+}
+
+.print-toolbar p { font-size: 13px; color: #555; }
+
+.btn-print {
+  font-family: -apple-system, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 20px;
+  background: #1a1a1a;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.print-document {
+  max-width: 760px;
+  margin: 40px auto;
+  padding: 0 40px 80px;
+}
+
+.print-doc-header {
+  text-align: center;
+  border-bottom: 2px solid #1a1a1a;
+  padding-bottom: 24px;
+  margin-bottom: 40px;
+}
+
+.print-doc-header h1 { font-size: 28pt; font-weight: bold; margin-bottom: 8px; }
+.print-doc-header p { font-size: 11pt; color: #555; font-style: italic; }
+
+h2 {
+  font-size: 16pt;
+  font-weight: bold;
+  border-bottom: 1px solid #1a1a1a;
+  padding-bottom: 6px;
+  margin: 40px 0 20px;
+  page-break-after: avoid;
+}
+
+h3 {
+  font-size: 13pt;
+  font-weight: bold;
+  margin: 24px 0 12px;
+  page-break-after: avoid;
+}
+
+.print-checklist { list-style: none; }
+
+.print-checklist li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  page-break-inside: avoid;
+}
+
+.print-checkbox {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #555;
+  margin-top: 3px;
+}
+
+.print-checklist strong { font-size: 11pt; }
+.print-checklist p { font-size: 10pt; color: #555; margin-top: 2px; }
+
+.print-vault-entry {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  page-break-inside: avoid;
+}
+
+.print-vault-entry__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.print-vault-entry__title { font-size: 12pt; font-weight: bold; }
+.print-vault-entry__verified { font-size: 9pt; color: #888; font-style: italic; }
+
+dl { display: grid; grid-template-columns: 160px 1fr; gap: 4px 12px; }
+dt { font-size: 10pt; font-weight: 600; color: #555; text-transform: capitalize; }
+dd { font-size: 10pt; }
+
+.print-note {
+  font-size: 10pt;
+  font-style: italic;
+  color: #888;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  border-left: 3px solid #ddd;
+}
+
+@media print {
+  .print-toolbar { display: none !important; }
+  .print-document { margin: 0; padding: 20px 40px 40px; max-width: 100%; }
+}
+
+@page { margin: 20mm; size: letter; }

@@ -17,11 +17,28 @@ interface ProfileRow {
   country: string
 }
 
+function isRealPastDate(val: string | null | undefined): boolean {
+  if (!val) return true
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) return false
+  const [y, m, d] = val.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  return (
+    date.getFullYear() === y &&
+    date.getMonth() === m - 1 &&
+    date.getDate() === d &&
+    date < new Date()
+  )
+}
+
 const updateSchema = z.object({
   first_name: z.string().min(1, 'First name is required').max(100).optional(),
   last_name: z.string().max(100).optional(),
-  date_of_birth: z.string().transform(v => v === '' ? null : v).pipe(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').nullable()).optional(),
-  phone: z.string().max(30).optional().nullable(),
+  date_of_birth: z.string().nullable().optional()
+    .transform(v => v === '' ? null : v)
+    .refine(isRealPastDate, 'Must be a valid date in the past'),
+  phone: z.string().nullable().optional()
+    .transform(v => v ? v.replace(/\D/g, '') || null : null)
+    .refine(v => !v || v.length === 10, 'Phone must be 10 digits'),
   address_line1: z.string().max(200).optional().nullable(),
   address_line2: z.string().max(200).optional().nullable(),
   city: z.string().max(100).optional().nullable(),

@@ -78,6 +78,8 @@ Required variables:
 
 For local email testing, use [Ethereal](https://ethereal.email) — create a free account and paste the SMTP credentials. Sent emails won't leave Ethereal; a preview URL is logged to the console.
 
+**Production note:** Gmail SMTP works for personal/dev use but is not suitable for production (rate limits, deliverability). Before deploying, migrate to [Resend](https://resend.com) — create an account, verify your sending domain, and swap the nodemailer transport in `lib/email.ts` for the Resend SDK (`npm install resend`). Update the env vars accordingly (`RESEND_API_KEY`, `EMAIL_FROM` set to your verified domain address).
+
 ### 4. Start the dev server
 
 ```bash

@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useRouter } from 'next/navigation'
+import { ErrorMessage } from '@/components/ErrorMessage'
 
 const schema = z
   .object({
@@ -78,7 +79,7 @@ export function RegisterForm({ token, emailHint }: Props) {
         )}
       </div>
 
-      {serverError && <p className="auth-error">{serverError}</p>}
+      {serverError && <ErrorMessage message={serverError} />}
 
       <button type="submit" disabled={isSubmitting} className="btn-primary">
         {isSubmitting ? 'Creating account…' : 'Create account'}
