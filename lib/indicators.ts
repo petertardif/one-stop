@@ -75,8 +75,16 @@ export function fcfGrowth(flows: FmpCashFlow[]): GrowthRates {
   return growthRates(flows.map((f) => f.freeCashFlow))
 }
 
-export function latestRoic(metrics: FmpKeyMetrics[]): number | null {
-  return metrics[0]?.roic ?? null
+export function roicRates(metrics: FmpKeyMetrics[]): GrowthRates {
+  function avg(slice: FmpKeyMetrics[]): number | null {
+    const vals = slice.map((m) => m.roic).filter((v): v is number => v !== null)
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null
+  }
+  return {
+    y1: metrics[0]?.roic ?? null,
+    y5: metrics.length >= 5 ? avg(metrics.slice(0, 5)) : null,
+    y10: metrics.length >= 10 ? avg(metrics.slice(0, 10)) : null,
+  }
 }
 
 export function effectiveGrowthRate(

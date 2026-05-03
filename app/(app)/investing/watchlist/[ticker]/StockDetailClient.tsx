@@ -33,7 +33,7 @@ interface FmpBig5Response {
   epsGrowth: { y1: number | null; y5: number | null; y10: number | null }
   equityGrowth: { y1: number | null; y5: number | null; y10: number | null }
   fcfGrowth: { y1: number | null; y5: number | null; y10: number | null }
-  roic: number | null
+  roic: { y1: number | null; y5: number | null; y10: number | null }
   analystGrowthRate: number | null
   effectiveGrowthRate: number
   sticker: { futureEPS: number; defaultPE: number; futurePrice: number; stickerPrice: number; mosPrice: number }

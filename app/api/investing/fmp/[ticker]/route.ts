@@ -15,7 +15,7 @@ import {
   epsGrowth,
   equityGrowth,
   fcfGrowth,
-  latestRoic,
+  roicRates,
   effectiveGrowthRate,
   calcSticker,
   calcMacd,
@@ -35,9 +35,19 @@ export async function GET(
 
   try {
     if (data === 'price') {
-      const profile = await fetchProfile(ticker)
-      if (!profile) return NextResponse.json({ error: 'Ticker not found' }, { status: 404 })
-      return NextResponse.json({ ticker, price: profile.price, companyName: profile.companyName })
+      const yahooRes = await fetch(
+        `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`,
+        { headers: { 'User-Agent': 'Mozilla/5.0' } }
+      )
+      if (!yahooRes.ok) return NextResponse.json({ error: 'Price not found' }, { status: 404 })
+      const yahooJson = await yahooRes.json()
+      const meta = yahooJson?.chart?.result?.[0]?.meta
+      if (!meta?.regularMarketPrice) return NextResponse.json({ error: 'Price not found' }, { status: 404 })
+      return NextResponse.json({
+        ticker,
+        price: meta.regularMarketPrice as number,
+        companyName: (meta.longName ?? meta.shortName ?? ticker) as string,
+      })
     }
 
     if (data === 'indicators') {
@@ -71,10 +81,12 @@ export async function GET(
       epsGrowth: eps,
       equityGrowth: equityGrowth(balance),
       fcfGrowth: fcfGrowth(cashflow),
-      roic: latestRoic(metrics),
+      roic: roicRates(metrics),
       analystGrowthRate: analystRate,
       effectiveGrowthRate: growthRate,
       sticker: calcSticker(profile.eps, growthRate),
+      currentEps: profile.eps,
+      currentPrice: profile.price,
     })
   } catch (err) {
     console.error('FMP error:', err)

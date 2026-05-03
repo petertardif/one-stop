@@ -5,7 +5,7 @@ interface Big5Data {
   epsGrowth: GrowthRates
   equityGrowth: GrowthRates
   fcfGrowth: GrowthRates
-  roic: number | null
+  roic: GrowthRates
 }
 
 function pct(v: number | null) {
@@ -21,12 +21,12 @@ function roicCell(v: number | null) {
 }
 
 export function Big5Table({ data }: { data: Big5Data }) {
-  const rows: { label: string; rates: GrowthRates | null; isRoic?: boolean }[] = [
+  const rows: { label: string; rates: GrowthRates; isRoic?: boolean }[] = [
     { label: 'Sales Growth', rates: data.salesGrowth },
     { label: 'EPS Growth', rates: data.epsGrowth },
     { label: 'Equity Growth', rates: data.equityGrowth },
     { label: 'Free Cash Flow', rates: data.fcfGrowth },
-    { label: 'ROIC', rates: null, isRoic: true },
+    { label: 'ROIC', rates: data.roic, isRoic: true },
   ]
 
   return (
@@ -45,14 +45,15 @@ export function Big5Table({ data }: { data: Big5Data }) {
             <td className="big5-table__metric">{row.label}</td>
             {row.isRoic ? (
               <>
-                <td colSpan={2} />
-                <td>{roicCell(data.roic)}</td>
+                <td>{roicCell(row.rates.y1)}</td>
+                <td>{roicCell(row.rates.y5)}</td>
+                <td>{roicCell(row.rates.y10)}</td>
               </>
             ) : (
               <>
-                <td>{pct(row.rates!.y1)}</td>
-                <td>{pct(row.rates!.y5)}</td>
-                <td>{pct(row.rates!.y10)}</td>
+                <td>{pct(row.rates.y1)}</td>
+                <td>{pct(row.rates.y5)}</td>
+                <td>{pct(row.rates.y10)}</td>
               </>
             )}
           </tr>
