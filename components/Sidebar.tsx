@@ -38,7 +38,7 @@ export function Sidebar({ role }: SidebarProps) {
   return (
     <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
       <Link href="/dashboard" className="sidebar__header">
-        <Image src="/logo.svg" alt="One Stop" width={28} height={28} className="sidebar__logo-icon" />
+        <Image src="/logo-forest.svg" alt="One Stop" width={28} height={28} className="sidebar__logo-icon" />
         <span className="sidebar__logo-text">One Stop</span>
       </Link>
 

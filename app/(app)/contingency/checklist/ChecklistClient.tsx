@@ -136,7 +136,10 @@ export function ChecklistClient({ initialItems, isAdmin }: Props) {
             {!isCollapsed && (
               <div className="checklist-group__body">
                 {catItems.length === 0 && !adding && (
-                  <p className="checklist-empty">No items yet.</p>
+                  <div className="empty-state empty-state--sm">
+                    <img src="/empty-checklist.svg" alt="" width={120} height={120} />
+                    <p className="empty-state__text">No items yet.</p>
+                  </div>
                 )}
 
                 {catItems.map((item) => (

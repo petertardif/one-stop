@@ -156,7 +156,10 @@ export function VaultCategoryClient({ initialEntries, categoryLabel, categorySlu
       )}
 
       {entries.length === 0 && !adding && (
-        <p className="dashboard__empty">No entries yet.{isAdmin ? ' Click "Add entry" to get started.' : ''}</p>
+        <div className="empty-state">
+          <img src="/empty-vault.svg" alt="" width={200} height={200} />
+          <p className="empty-state__text">No entries yet.{isAdmin ? ' Click "Add entry" to get started.' : ''}</p>
+        </div>
       )}
 
       {entries.map((entry) => (
