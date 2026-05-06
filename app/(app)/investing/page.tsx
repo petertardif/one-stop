@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { authOptions } from '@/lib/auth'
 import { query } from '@/lib/db'
 
+export const dynamic = 'force-dynamic'
+
 export default async function InvestingPage() {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')

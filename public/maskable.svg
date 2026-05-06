@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  
+  <rect width="512" height="512" fill="#1B3A2C"></rect>
+  
+  <g transform="translate(256, 256) scale(0.6) translate(-256, -256)">
+    <g transform="translate(256, 248)">
+      <polygon points="0,-176 152,-32 -152,-32" fill="#FDFBF6"></polygon>
+      <rect x="-120" y="-32" width="240" height="168" fill="#FDFBF6"></rect>
+      <g transform="translate(0, 44)">
+        <circle cx="0" cy="0" r="38" fill="#1B3A2C"></circle>
+        <circle cx="0" cy="0" r="32" fill="none" stroke="#FDFBF6" stroke-width="1.5" opacity="0.25"></circle>
+        <rect x="-1.5" y="-38" width="3" height="8" fill="#FDFBF6" opacity="0.6"></rect>
+        <circle cx="0" cy="0" r="6" fill="#FDFBF6"></circle>
+        <g fill="#1B3A2C">
+          <g transform="translate(0,-52)"><rect x="-5" y="-14" width="10" height="28" rx="3"></rect></g>
+          <g transform="translate(36.77,-36.77) rotate(45)"><rect x="-5" y="-14" width="10" height="28" rx="3"></rect></g>
+          <g transform="translate(52,0) rotate(90)"><rect x="-5" y="-14" width="10" height="28" rx="3"></rect></g>
+          <g transform="translate(36.77,36.77) rotate(135)"><rect x="-5" y="-14" width="10" height="28" rx="3"></rect></g>
+          <g transform="translate(0,52) rotate(180)"><rect x="-5" y="-14" width="10" height="28" rx="3"></rect></g>
+          <g transform="translate(-36.77,36.77) rotate(225)"><rect x="-5" y="-14" width="10" height="28" rx="3"></rect></g>
+          <g transform="translate(-52,0) rotate(270)"><rect x="-5" y="-14" width="10" height="28" rx="3"></rect></g>
+          <g transform="translate(-36.77,-36.77) rotate(315)"><rect x="-5" y="-14" width="10" height="28" rx="3"></rect></g>
+        </g>
+      </g>
+      <rect x="-88" y="112" width="176" height="32" rx="4" fill="#FDFBF6"></rect>
+    </g>
+  </g>
+</svg>

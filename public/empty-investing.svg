@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200" fill="none" stroke="#2F5641" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <g transform="translate(80, 40)">
+    <rect x="0" y="0" width="160" height="100" rx="3"></rect>
+    <polyline points="10,80 35,72 60,76 90,52 115,60 140,30 150,32" stroke="#C7B27A" stroke-width="1.5"></polyline>
+    <g opacity="0.4">
+      <line x1="10" y1="92" x2="150" y2="92"></line>
+      <line x1="10" y1="20" x2="14" y2="20"></line>
+      <line x1="10" y1="50" x2="14" y2="50"></line>
+      <line x1="10" y1="80" x2="14" y2="80"></line>
+    </g>
+  </g>
+  <g transform="translate(160, 30)" opacity="0.7">
+    <path d="M-12 0 C -7 -8 7 -8 12 0 C 7 8 -7 8 -12 0 z"></path>
+    <circle cx="0" cy="0" r="3" fill="#2F5641" stroke="none"></circle>
+  </g>
+  <line x1="20" y1="170" x2="300" y2="170" opacity="0.4"></line>
+</svg>

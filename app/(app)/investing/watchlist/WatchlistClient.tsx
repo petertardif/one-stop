@@ -59,10 +59,13 @@ export function WatchlistClient({ initialRows, isAdmin }: { initialRows: Watchli
 
   if (rows.length === 0) {
     return (
-      <p className="dashboard__empty">
-        No stocks on your watchlist yet.{' '}
-        <Link href="/investing/calculator" className="link">Analyze a stock</Link> to add one.
-      </p>
+      <div className="empty-state">
+        <img src="/empty-investing.svg" alt="" width={200} height={200} />
+        <p className="empty-state__text">
+          No stocks on your watchlist yet.{' '}
+          <Link href="/investing/calculator" className="link">Analyze a stock</Link> to add one.
+        </p>
+      </div>
     )
   }
 
@@ -113,7 +116,7 @@ export function WatchlistClient({ initialRows, isAdmin }: { initialRows: Watchli
                     disabled={deleting === row.ticker}
                     title="Remove from watchlist"
                   >
-                    <Trash2 size={13} />
+                    <Trash2 size={16} />
                   </button>
                 </td>
               )}
