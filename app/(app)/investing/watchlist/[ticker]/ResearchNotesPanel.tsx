@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Trash2, X } from 'lucide-react'
 import { ErrorMessage } from '@/components/ErrorMessage'
 
 interface Note {
@@ -21,8 +21,19 @@ export function ResearchNotesPanel({ ticker, initialNotes, isAdmin }: Props) {
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const dialogRef = useRef<HTMLDialogElement>(null)
 
-  async function handleAdd() {
+  function openModal() {
+    setDraft('')
+    setError(null)
+    dialogRef.current?.showModal()
+  }
+
+  function closeModal() {
+    dialogRef.current?.close()
+  }
+
+  async function handleSave() {
     if (!draft.trim()) return
     setSaving(true)
     setError(null)
@@ -39,8 +50,8 @@ export function ResearchNotesPanel({ ticker, initialNotes, isAdmin }: Props) {
     }
     const { note } = await res.json()
     setNotes((prev) => [note, ...prev])
-    setDraft('')
     setSaving(false)
+    closeModal()
   }
 
   async function handleDelete(id: string) {
@@ -52,21 +63,11 @@ export function ResearchNotesPanel({ ticker, initialNotes, isAdmin }: Props) {
   return (
     <div className="notes-section">
       {isAdmin && (
-        <div className="notes-add-form">
-          <textarea
-            rows={3}
-            placeholder="Add a research note…"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          {error && <ErrorMessage message={error} />}
-          <div className="form-actions__right">
-            <button className="btn-primary btn-sm" onClick={handleAdd} disabled={saving || !draft.trim()}>
-              {saving ? 'Saving…' : 'Add Note'}
-            </button>
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--spacing-md)' }}>
+          <button className="btn-primary btn-sm" onClick={openModal}>+ Add Note</button>
         </div>
       )}
+
       {notes.length === 0 ? (
         <p className="dashboard__empty">No research notes yet.</p>
       ) : (
@@ -88,6 +89,37 @@ export function ResearchNotesPanel({ ticker, initialNotes, isAdmin }: Props) {
           ))}
         </ul>
       )}
+
+      <dialog
+        ref={dialogRef}
+        className="modal"
+        onClick={(e) => { if (e.target === dialogRef.current) closeModal() }}
+      >
+        <div className="modal__content">
+          <div className="modal__header">
+            <h2>Add Note</h2>
+            <button className="modal__close" onClick={closeModal} aria-label="Close">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="form-field">
+            <textarea
+              rows={5}
+              placeholder="Write your research note…"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              autoFocus
+            />
+          </div>
+          {error && <ErrorMessage message={error} />}
+          <div className="modal__actions">
+            <button className="btn-secondary" onClick={closeModal}>Cancel</button>
+            <button className="btn-primary" onClick={handleSave} disabled={saving || !draft.trim()}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </dialog>
     </div>
   )
 }

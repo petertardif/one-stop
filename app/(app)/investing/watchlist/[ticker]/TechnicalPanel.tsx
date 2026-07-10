@@ -5,7 +5,7 @@ import { MacdChart } from '@/components/investing/MacdChart'
 import { StochasticChart } from '@/components/investing/StochasticChart'
 import { SmaChart } from '@/components/investing/SmaChart'
 import { Spinner } from '@/components/Spinner'
-import { ErrorMessage } from '@/components/ErrorMessage'
+import { InvestingError } from '@/components/investing/InvestingError'
 import type { MacdPoint, StochPoint, SmaPoint } from '@/lib/indicators'
 
 interface IndicatorsResponse {
@@ -23,10 +23,11 @@ export function TechnicalPanel({ ticker }: { ticker: string }) {
       return res.json()
     },
     staleTime: 10 * 60 * 1000,
+    retry: false,
   })
 
   if (isLoading) return <Spinner />
-  if (error) return <ErrorMessage message={(error as Error).message} />
+  if (error) return <InvestingError message="Failed to load technical indicators." detail={(error as Error).message} />
   if (!data) return null
 
   return (

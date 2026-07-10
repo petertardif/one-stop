@@ -8,7 +8,7 @@ const MOAT_TYPES = ['brand', 'switching', 'toll', 'cost', 'secret'] as const
 
 const schema = z.object({
   meaning_notes: z.string().nullable().optional(),
-  moat_type: z.enum(MOAT_TYPES).nullable().optional(),
+  moat_types: z.array(z.enum(MOAT_TYPES)).optional(),
   moat_notes: z.string().nullable().optional(),
   management_notes: z.string().nullable().optional(),
   mos_notes: z.string().nullable().optional(),
@@ -59,11 +59,11 @@ export async function PUT(
   const d = parsed.data
   await query(
     `INSERT INTO four_ms_entries
-       (watchlist_entry_id, meaning_notes, moat_type, moat_notes, management_notes, mos_notes)
+       (watchlist_entry_id, meaning_notes, moat_types, moat_notes, management_notes, mos_notes)
      VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (watchlist_entry_id) DO UPDATE SET
        meaning_notes = EXCLUDED.meaning_notes,
-       moat_type = EXCLUDED.moat_type,
+       moat_types = EXCLUDED.moat_types,
        moat_notes = EXCLUDED.moat_notes,
        management_notes = EXCLUDED.management_notes,
        mos_notes = EXCLUDED.mos_notes,
@@ -71,7 +71,7 @@ export async function PUT(
     [
       entryId,
       d.meaning_notes ?? null,
-      d.moat_type ?? null,
+      JSON.stringify(d.moat_types ?? []),
       d.moat_notes ?? null,
       d.management_notes ?? null,
       d.mos_notes ?? null,

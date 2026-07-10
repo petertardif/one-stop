@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Search, RefreshCw, AlertTriangle, Pencil, Info } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Search, RefreshCw, Pencil, Info, Save, ChevronRight, X } from 'lucide-react'
 import { Big5Table } from '@/components/investing/Big5Table'
 import { StickerPricePanel } from '@/components/investing/StickerPricePanel'
+import { InvestingError } from '@/components/investing/InvestingError'
 import { calcSticker } from '@/lib/indicators'
 import { Spinner } from '@/components/Spinner'
 import { ErrorMessage } from '@/components/ErrorMessage'
@@ -134,6 +135,10 @@ function savedEntryToDisplayData(entry: {
 
 export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const alreadyResearchedDialogRef = useRef<HTMLDialogElement>(null)
+  const initialAnalyzed = useRef(false)
+  const [alreadyResearched, setAlreadyResearched] = useState<'watchlist' | 'too-hard' | null>(null)
   const [input, setInput] = useState('')
   const [ticker, setTicker] = useState('')
   const [status, setStatus] = useState<CalcStatus>('idle')
@@ -148,6 +153,17 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
   const [livePrice, setLivePrice] = useState<number | null>(null)
   const [priceFetchFailed, setPriceFetchFailed] = useState(false)
   const [manualPriceInput, setManualPriceInput] = useState('')
+
+  useEffect(() => {
+    if (initialAnalyzed.current) return
+    initialAnalyzed.current = true
+    const t = searchParams.get('ticker')?.toUpperCase()
+    if (t) {
+      setInput(t)
+      setTicker(t)
+      analyze(t)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchLivePrice(t: string) {
     const res = await fetch(`/api/investing/fmp/${t}?data=price`)
@@ -178,7 +194,48 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
         setDisplayData(savedEntryToDisplayData(json.entry))
         setStatus('saved')
         void fetchLivePrice(t)
+        setAlreadyResearched('watchlist')
+        alreadyResearchedDialogRef.current?.showModal()
         return
+      }
+
+      const tooHardRes = await fetch(`/api/investing/too-hard/ticker/${t}`)
+      if (tooHardRes.ok) {
+        const json = await tooHardRes.json()
+        const e = json.entry
+
+        if (e.reanalyzed_at) {
+          // Reanalyze flow: populate data silently without the modal
+          if (e.big5_data) {
+            setDisplayData(savedEntryToDisplayData({
+              company_name: e.company_name,
+              sector: e.sector ?? null,
+              growth_rate_used: e.growth_rate_used ?? null,
+              big5_data: e.big5_data,
+              added_at: e.dismissed_at,
+            }))
+            setStatus('api-success')
+            void fetchLivePrice(t)
+            return
+          }
+          // No data saved — fall through to FMP
+        } else {
+          // Normal too-hard: show the "Research Done" modal
+          if (e.big5_data) {
+            setDisplayData(savedEntryToDisplayData({
+              company_name: e.company_name,
+              sector: e.sector ?? null,
+              growth_rate_used: e.growth_rate_used ?? null,
+              big5_data: e.big5_data,
+              added_at: e.dismissed_at,
+            }))
+            setStatus('saved')
+            void fetchLivePrice(t)
+          }
+          setAlreadyResearched('too-hard')
+          alreadyResearchedDialogRef.current?.showModal()
+          return
+        }
       }
     }
 
@@ -274,8 +331,8 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
-  async function saveToWatchlist() {
-    if (!activeData || !ticker) return
+  async function performSave(): Promise<boolean> {
+    if (!activeData || !ticker) return false
     setSaving(true)
     setSaveError(null)
     const res = await fetch('/api/investing/watchlist', {
@@ -287,29 +344,17 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
       const err = await res.json()
       setSaveError(err.error ?? 'Failed to save')
       setSaving(false)
-      return
+      return false
     }
     setDisplayData({ ...activeData, savedAt: new Date().toISOString() })
     setStatus('saved')
     setSaving(false)
+    return true
   }
 
-  async function addToWatchlist() {
-    if (!displayData || !ticker) return
-    setSaving(true)
-    setSaveError(null)
-    const res = await fetch('/api/investing/watchlist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildPayload(displayData)),
-    })
-    if (!res.ok) {
-      const err = await res.json()
-      setSaveError(err.error ?? 'Failed to add')
-      setSaving(false)
-      return
-    }
-    router.push('/investing/watchlist')
+  async function saveAndNext() {
+    const ok = await performSave()
+    if (ok) router.push(`/investing/4ms?ticker=${ticker}`)
   }
 
   async function updateWatchlist() {
@@ -387,6 +432,40 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div className="calculator">
+      <dialog
+        ref={alreadyResearchedDialogRef}
+        className="modal"
+        onClick={(e) => { if (e.target === alreadyResearchedDialogRef.current) alreadyResearchedDialogRef.current?.close() }}
+      >
+        <div className="modal__content">
+          <div className="modal__header">
+            <h2>Research Done</h2>
+            <button className="modal__close" onClick={() => alreadyResearchedDialogRef.current?.close()} aria-label="Close">
+              <X size={18} />
+            </button>
+          </div>
+          <p style={{ marginBottom: 'var(--spacing-lg)' }}>
+            You already completed researching this company. It can be accessed on the{' '}
+            <strong>{alreadyResearched === 'watchlist' ? 'Watchlist' : 'Too Hard Pile'}</strong>.
+          </p>
+          <div className="modal__actions">
+            <button className="btn-secondary" onClick={() => alreadyResearchedDialogRef.current?.close()}>
+              Dismiss
+            </button>
+            <button
+              className="btn-primary"
+              onClick={() => router.push(
+                alreadyResearched === 'watchlist'
+                  ? `/investing/watchlist/${ticker}`
+                  : '/investing/too-hard'
+              )}
+            >
+              Take me there
+            </button>
+          </div>
+        </div>
+      </dialog>
+
       <form onSubmit={handleSubmit} className="calculator__ticker-form">
         <div className="form-field" style={{ flex: 1 }}>
           <label htmlFor="ticker">Stock ticker</label>
@@ -407,13 +486,7 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
       {status === 'loading' && <Spinner />}
 
       {status === 'api-failure' && (
-        <div className="calculator__warning">
-          <AlertTriangle size={16} />
-          <div className="calculator__warning-body">
-            <span>Data retrieval error. Please enter data manually.</span>
-            {apiError && <ApiErrorDetail error={apiError} />}
-          </div>
-        </div>
+        <InvestingError message="Data retrieval error. Please enter data manually." detail={apiError} />
       )}
 
       {status === 'saved' && displayData?.savedAt && (
@@ -456,10 +529,7 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       {status === 'saved' && refreshError && (
-        <div className="calculator__warning">
-          <AlertTriangle size={16} />
-          <span>API refresh failed: {refreshError} Your saved data is unchanged.</span>
-        </div>
+        <InvestingError message={`API refresh failed: ${refreshError} Your saved data is unchanged.`} />
       )}
 
       {status === 'api-refresh-success' && (
@@ -566,8 +636,11 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
 
           {isAdmin && status === 'api-success' && (
             <div className="form-actions__right">
-              <button className="btn-primary" onClick={addToWatchlist} disabled={saving}>
-                {saving ? 'Adding…' : '+ Add to Watchlist'}
+              <button className="btn-secondary" onClick={performSave} disabled={saving}>
+                <Save size={15} /> {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button className="btn-primary" onClick={saveAndNext} disabled={saving}>
+                Save and Next <ChevronRight size={15} />
               </button>
             </div>
           )}
@@ -586,11 +659,18 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
           {isAdmin && status === 'api-failure' && (
             <div className="form-actions__right">
               <button
-                className="btn-primary"
-                onClick={saveToWatchlist}
+                className="btn-secondary"
+                onClick={performSave}
                 disabled={saving || !manualForm.companyName.trim()}
               >
-                {saving ? 'Saving…' : 'Save to Watchlist'}
+                <Save size={15} /> {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                className="btn-primary"
+                onClick={saveAndNext}
+                disabled={saving || !manualForm.companyName.trim()}
+              >
+                Save and Next <ChevronRight size={15} />
               </button>
             </div>
           )}
@@ -601,18 +681,6 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
   )
 }
 
-function ApiErrorDetail({ error }: { error: string }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="calculator__dev-error">
-      <button className="calculator__dev-error-toggle" onClick={() => setOpen((o) => !o)}>
-        <span>Developer error</span>
-        <span className={`calculator__dev-error-caret${open ? ' calculator__dev-error-caret--open' : ''}`}>▸</span>
-      </button>
-      {open && <pre className="calculator__dev-error-body">{error}</pre>}
-    </div>
-  )
-}
 
 function ManualEntryForm({
   form,

@@ -4,6 +4,11 @@ import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import { query } from '@/lib/db'
 
+const stockInfoSchema = z.object({
+  company_name: z.string().min(1),
+  sector: z.string().nullable().optional(),
+})
+
 const updateSchema = z.object({
   sticker_price: z.number().nullable().optional(),
   mos_price: z.number().nullable().optional(),
@@ -82,6 +87,36 @@ export async function PUT(
   values.push(entryRes.rows[0].id)
 
   await query(`UPDATE watchlist_entries SET ${fields.join(', ')} WHERE id = $${idx}`, values)
+  return NextResponse.json({ success: true })
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { ticker: string } }
+) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'admin') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const body = await req.json()
+  const parsed = stockInfoSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+  }
+
+  const entryRes = await getEntry(params.ticker, session.user.id)
+  if (entryRes.rowCount === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  await query(
+    `UPDATE stocks SET company_name = $1, sector = $2, updated_at = NOW()
+     FROM watchlist_entries
+     WHERE stocks.id = watchlist_entries.stock_id
+       AND watchlist_entries.user_id = $3
+       AND stocks.ticker = $4`,
+    [parsed.data.company_name, parsed.data.sector ?? null, session.user.id, params.ticker.toUpperCase()]
+  )
+
   return NextResponse.json({ success: true })
 }
 

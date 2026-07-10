@@ -1,0 +1,4 @@
+ALTER TABLE too_hard_entries
+  ADD COLUMN IF NOT EXISTS sector TEXT,
+  ADD COLUMN IF NOT EXISTS growth_rate_used NUMERIC(6,4),
+  ADD COLUMN IF NOT EXISTS big5_data JSONB;
