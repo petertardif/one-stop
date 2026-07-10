@@ -16,7 +16,7 @@ export async function GET() {
 
   const result = await query(
     `SELECT id, ticker, company_name, reason, dismissed_at
-     FROM too_hard_entries WHERE user_id = $1 ORDER BY dismissed_at DESC`,
+     FROM too_hard_entries WHERE user_id = $1 AND reanalyzed_at IS NULL ORDER BY dismissed_at DESC`,
     [session.user.id]
   )
   return NextResponse.json(result.rows)
@@ -36,7 +36,16 @@ export async function POST(req: NextRequest) {
 
   const d = parsed.data
 
-  // Remove from watchlist if present
+  // Capture saved big5 data from watchlist before deleting
+  const savedRes = await query(
+    `SELECT we.big5_data, we.growth_rate_used, s.sector
+     FROM watchlist_entries we
+     JOIN stocks s ON s.id = we.stock_id
+     WHERE s.ticker = $1 AND we.user_id = $2`,
+    [d.ticker, session.user.id]
+  )
+  const saved = savedRes.rows[0] ?? null
+
   await query(
     `DELETE FROM watchlist_entries we
      USING stocks s
@@ -45,9 +54,17 @@ export async function POST(req: NextRequest) {
   )
 
   const result = await query<{ id: string }>(
-    `INSERT INTO too_hard_entries (user_id, ticker, company_name, reason)
-     VALUES ($1, $2, $3, $4) RETURNING id`,
-    [session.user.id, d.ticker, d.company_name, d.reason ?? null]
+    `INSERT INTO too_hard_entries (user_id, ticker, company_name, reason, sector, growth_rate_used, big5_data)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    [
+      session.user.id,
+      d.ticker,
+      d.company_name,
+      d.reason ?? null,
+      saved?.sector ?? null,
+      saved?.growth_rate_used ?? null,
+      saved?.big5_data ? JSON.stringify(saved.big5_data) : null,
+    ]
   )
 
   return NextResponse.json({ id: result.rows[0].id }, { status: 201 })

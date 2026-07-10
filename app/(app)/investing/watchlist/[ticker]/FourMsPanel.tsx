@@ -9,7 +9,7 @@ type MoatType = typeof MOAT_TYPES[number]
 
 interface FourMs {
   meaning_notes: string | null
-  moat_type: MoatType | null
+  moat_types: MoatType[]
   moat_notes: string | null
   management_notes: string | null
   mos_notes: string | null
@@ -36,13 +36,22 @@ function Field({ label, value }: { label: string; value: string | null }) {
 
 export function FourMsPanel({ ticker, initial, isAdmin }: Props) {
   const [data, setData] = useState<FourMs>(initial ?? {
-    meaning_notes: null, moat_type: null, moat_notes: null,
+    meaning_notes: null, moat_types: [], moat_notes: null,
     management_notes: null, mos_notes: null,
   })
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<FourMs>(data)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  function toggleMoat(t: MoatType) {
+    setDraft((prev) => ({
+      ...prev,
+      moat_types: prev.moat_types.includes(t)
+        ? prev.moat_types.filter((m) => m !== t)
+        : [...prev.moat_types, t],
+    }))
+  }
 
   async function handleSave() {
     setSaving(true)
@@ -71,14 +80,14 @@ export function FourMsPanel({ ticker, initial, isAdmin }: Props) {
           <textarea rows={3} value={draft.meaning_notes ?? ''} onChange={(e) => setDraft({ ...draft, meaning_notes: e.target.value })} />
         </div>
         <div className="form-field">
-          <label>Moat — Competitive advantage type</label>
+          <label>Moat — Competitive advantage type (select all that apply)</label>
           <div className="moat-type-pills">
             {MOAT_TYPES.map((t) => (
               <button
                 key={t}
                 type="button"
-                className={`role-pill${draft.moat_type === t ? ' role-pill--selected' : ''}`}
-                onClick={() => setDraft({ ...draft, moat_type: draft.moat_type === t ? null : t })}
+                className={`role-pill${draft.moat_types.includes(t) ? ' role-pill--selected' : ''}`}
+                onClick={() => toggleMoat(t)}
               >
                 {t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
@@ -120,8 +129,16 @@ export function FourMsPanel({ ticker, initial, isAdmin }: Props) {
       <Field label="Meaning" value={data.meaning_notes} />
       <div className="four-ms-item">
         <span className="four-ms-item__label">Moat</span>
-        {data.moat_type && <span className="role-pill role-pill--selected" style={{ alignSelf: 'flex-start' }}>{data.moat_type}</span>}
-        {data.moat_notes ? <p className="four-ms-item__content">{data.moat_notes}</p> : <p className="four-ms-item__empty">Not filled in yet.</p>}
+        {data.moat_types.length > 0 ? (
+          <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            {data.moat_types.map((t) => (
+              <span key={t} className="role-pill role-pill--selected">{t.charAt(0).toUpperCase() + t.slice(1)}</span>
+            ))}
+          </div>
+        ) : (
+          <p className="four-ms-item__empty">Not filled in yet.</p>
+        )}
+        {data.moat_notes && <p className="four-ms-item__content">{data.moat_notes}</p>}
       </div>
       <Field label="Management" value={data.management_notes} />
       <Field label="Margin of Safety" value={data.mos_notes} />

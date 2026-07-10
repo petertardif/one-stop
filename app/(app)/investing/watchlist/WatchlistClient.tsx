@@ -31,11 +31,7 @@ function pct(v: number | null) {
 function LivePrice({ ticker }: { ticker: string }) {
   const { data, isLoading } = useQuery<{ price: number }>({
     queryKey: ['price', ticker],
-    queryFn: async () => {
-      const res = await fetch(`/api/investing/fmp/${ticker}?data=price`)
-      if (!res.ok) throw new Error('Failed')
-      return res.json()
-    },
+    queryFn: priceQueryFn(ticker),
     staleTime: 5 * 60 * 1000,
   })
   if (isLoading) return <span className="text-muted">…</span>
@@ -128,10 +124,19 @@ export function WatchlistClient({ initialRows, isAdmin }: { initialRows: Watchli
   )
 }
 
+function priceQueryFn(ticker: string) {
+  return async () => {
+    const res = await fetch(`/api/investing/fmp/${ticker}?data=price`)
+    if (!res.ok) throw new Error('Failed')
+    return res.json() as Promise<{ price: number }>
+  }
+}
+
 function MosPct({ ticker, mos }: { ticker: string; mos: number | null }) {
   const { data } = useQuery<{ price: number }>({
     queryKey: ['price', ticker],
-    enabled: false, // reuses cached data from LivePrice
+    queryFn: priceQueryFn(ticker),
+    staleTime: 5 * 60 * 1000,
   })
   if (!data || mos === null) return <span className="text-muted">—</span>
   const diff = (data.price - mos) / mos
@@ -141,7 +146,8 @@ function MosPct({ ticker, mos }: { ticker: string; mos: number | null }) {
 function MosStatus({ ticker, sticker, mos }: { ticker: string; sticker: number | null; mos: number | null }) {
   const { data } = useQuery<{ price: number }>({
     queryKey: ['price', ticker],
-    enabled: false,
+    queryFn: priceQueryFn(ticker),
+    staleTime: 5 * 60 * 1000,
   })
   return <StatusBadge price={data?.price ?? null} stickerPrice={sticker} mosPrice={mos} />
 }

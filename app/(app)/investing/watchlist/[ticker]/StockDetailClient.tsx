@@ -1,21 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
+import { RefreshCw } from 'lucide-react'
+import { calcSticker } from '@/lib/indicators'
 import { Big5Table } from '@/components/investing/Big5Table'
 import { StickerPricePanel } from '@/components/investing/StickerPricePanel'
 import { FourMsPanel } from './FourMsPanel'
 import { TechnicalPanel } from './TechnicalPanel'
 import { ResearchNotesPanel } from './ResearchNotesPanel'
 import { Spinner } from '@/components/Spinner'
-import { ErrorMessage } from '@/components/ErrorMessage'
+import { InvestingError } from '@/components/investing/InvestingError'
 
 type MoatType = 'brand' | 'switching' | 'toll' | 'cost' | 'secret'
+type GrowthRates = { y1: number | null; y5: number | null; y10: number | null }
 
 interface FourMs {
   meaning_notes: string | null
-  moat_type: MoatType | null
+  moat_types: MoatType[]
   moat_notes: string | null
   management_notes: string | null
   mos_notes: string | null
@@ -27,13 +28,24 @@ interface Note {
   created_at: string
 }
 
+interface Big5Snapshot {
+  salesGrowth: GrowthRates
+  epsGrowth: GrowthRates
+  equityGrowth: GrowthRates
+  fcfGrowth: GrowthRates
+  roic: GrowthRates | number | null
+  currentEps: number | null
+  currentPrice: number | null
+  analystEstimate: number | null
+}
+
 interface FmpBig5Response {
   profile: { companyName: string; sector: string; price: number; eps: number }
-  salesGrowth: { y1: number | null; y5: number | null; y10: number | null }
-  epsGrowth: { y1: number | null; y5: number | null; y10: number | null }
-  equityGrowth: { y1: number | null; y5: number | null; y10: number | null }
-  fcfGrowth: { y1: number | null; y5: number | null; y10: number | null }
-  roic: { y1: number | null; y5: number | null; y10: number | null }
+  salesGrowth: GrowthRates
+  epsGrowth: GrowthRates
+  equityGrowth: GrowthRates
+  fcfGrowth: GrowthRates
+  roic: GrowthRates
   analystGrowthRate: number | null
   effectiveGrowthRate: number
   sticker: { futureEPS: number; defaultPE: number; futurePrice: number; stickerPrice: number; mosPrice: number }
@@ -41,68 +53,107 @@ interface FmpBig5Response {
 
 interface Props {
   ticker: string
-  companyName: string
   isAdmin: boolean
   initialFourMs: FourMs | null
   initialNotes: Note[]
+  big5Data: Big5Snapshot | null
+  growthRateUsed: number | null
 }
 
-export function StockDetailClient({ ticker, companyName, isAdmin, initialFourMs, initialNotes }: Props) {
-  const router = useRouter()
-  const [movingToTooHard, setMovingToTooHard] = useState(false)
-  const [reason, setReason] = useState('')
-  const [showTooHardForm, setShowTooHardForm] = useState(false)
-  const [tooHardError, setTooHardError] = useState<string | null>(null)
+function normalizeRoic(roic: GrowthRates | number | null): GrowthRates {
+  if (roic !== null && typeof roic === 'object') return roic as GrowthRates
+  return { y1: typeof roic === 'number' ? roic : null, y5: null, y10: null }
+}
 
-  const { data, isFetching, error } = useQuery<FmpBig5Response>({
-    queryKey: ['fmp', ticker, 'big5'],
-    queryFn: async () => {
-      const res = await fetch(`/api/investing/fmp/${ticker}?data=big5`)
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error ?? 'Failed to fetch data')
-      }
-      return res.json()
-    },
-    staleTime: 10 * 60 * 1000,
-    retry: false,
-  })
+export function StockDetailClient({ ticker, isAdmin, initialFourMs, initialNotes, big5Data, growthRateUsed }: Props) {
+  const [fmpData, setFmpData] = useState<FmpBig5Response | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
 
-  async function handleMoveToTooHard() {
-    setMovingToTooHard(true)
-    setTooHardError(null)
-    const res = await fetch('/api/investing/too-hard', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ticker, company_name: companyName, reason: reason.trim() || null }),
-    })
+  async function handleRefresh() {
+    setIsRefreshing(true)
+    setRefreshError(null)
+    const res = await fetch(`/api/investing/fmp/${ticker}?data=big5`)
     if (!res.ok) {
-      const d = await res.json()
-      setTooHardError(d.error ?? 'Failed')
-      setMovingToTooHard(false)
+      try {
+        const err = await res.json()
+        setRefreshError(err.error ?? 'Could not fetch from API.')
+      } catch {
+        setRefreshError('Could not fetch from API.')
+      }
+      setIsRefreshing(false)
       return
     }
-    router.push('/investing/too-hard')
+    setFmpData(await res.json())
+    setIsRefreshing(false)
   }
+
+  const normalizedBig5 = big5Data
+    ? {
+        salesGrowth: big5Data.salesGrowth,
+        epsGrowth: big5Data.epsGrowth,
+        equityGrowth: big5Data.equityGrowth,
+        fcfGrowth: big5Data.fcfGrowth,
+        roic: normalizeRoic(big5Data.roic),
+      }
+    : null
+
+  const savedSticker =
+    big5Data?.currentEps && big5Data.currentEps > 0 && growthRateUsed !== null
+      ? calcSticker(big5Data.currentEps, growthRateUsed)
+      : null
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
       <section>
-        <h2 className="section-label">Big 5 Growth Numbers</h2>
-        {isFetching && <Spinner />}
-        {error && <ErrorMessage message={(error as Error).message} />}
-        {data && !isFetching && (
+        <div className="dashboard__section-header" style={{ marginBottom: 'var(--spacing-sm)' }}>
+          <h2 className="section-label" style={{ marginBottom: 0 }}>Big 5 Growth Numbers</h2>
+          <button className="btn-secondary btn-sm" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw size={13} /> {isRefreshing ? 'Refreshing…' : 'Refresh from API'}
+          </button>
+        </div>
+
+        {isRefreshing && <Spinner />}
+
+        {refreshError && (
+          <InvestingError message="API refresh failed. Saved data is shown below." detail={refreshError} />
+        )}
+
+        {fmpData && !isRefreshing && (
           <>
-            <Big5Table data={data} />
+            <div className="calculator__saved-banner">
+              <span>Showing fresh data from API — not saved to watchlist.</span>
+            </div>
+            <Big5Table data={fmpData} />
             <div style={{ marginTop: 'var(--spacing-lg)' }}>
               <h2 className="section-label">Sticker Price &amp; Margin of Safety</h2>
               <StickerPricePanel
-                sticker={data.sticker}
-                currentPrice={data.profile.price}
-                growthRate={data.effectiveGrowthRate}
+                sticker={fmpData.sticker}
+                currentPrice={fmpData.profile.price}
+                growthRate={fmpData.effectiveGrowthRate}
               />
             </div>
           </>
+        )}
+
+        {!fmpData && !isRefreshing && normalizedBig5 && (
+          <>
+            <Big5Table data={normalizedBig5} />
+            {savedSticker && (
+              <div style={{ marginTop: 'var(--spacing-lg)' }}>
+                <h2 className="section-label">Sticker Price &amp; Margin of Safety</h2>
+                <StickerPricePanel
+                  sticker={savedSticker}
+                  currentPrice={big5Data?.currentPrice ?? undefined}
+                  growthRate={growthRateUsed!}
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {!fmpData && !isRefreshing && !normalizedBig5 && (
+          <p className="dashboard__empty">No Big 5 data saved. Click "Refresh from API" to fetch.</p>
         )}
       </section>
 
@@ -120,30 +171,6 @@ export function StockDetailClient({ ticker, companyName, isAdmin, initialFourMs,
         <h2 className="section-label">Research Notes</h2>
         <ResearchNotesPanel ticker={ticker} initialNotes={initialNotes} isAdmin={isAdmin} />
       </section>
-
-      {isAdmin && (
-        <section>
-          {!showTooHardForm ? (
-            <button className="btn-secondary btn-sm" onClick={() => setShowTooHardForm(true)}>
-              Move to Too Hard Pile
-            </button>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)', maxWidth: 480 }}>
-              <label className="form-field">
-                <span>Reason (optional)</span>
-                <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why are you passing on this stock?" />
-              </label>
-              {tooHardError && <ErrorMessage message={tooHardError} />}
-              <div className="form-actions__right">
-                <button className="btn-secondary btn-sm" onClick={() => setShowTooHardForm(false)}>Cancel</button>
-                <button className="btn-danger btn-sm" onClick={handleMoveToTooHard} disabled={movingToTooHard}>
-                  {movingToTooHard ? 'Moving…' : 'Confirm — Move to Too Hard'}
-                </button>
-              </div>
-            </div>
-          )}
-        </section>
-      )}
     </div>
   )
 }

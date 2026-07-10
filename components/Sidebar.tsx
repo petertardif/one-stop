@@ -12,6 +12,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
 } from 'lucide-react'
 
 interface NavItem {
@@ -23,8 +24,13 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={18} /> },
   { label: 'Monthly Budget', href: '/monthly', icon: <Receipt size={18} /> },
-  { label: 'Investing', href: '/investing', icon: <TrendingUp size={18} /> },
   { label: 'In Case I Die', href: '/contingency', icon: <Heart size={18} /> },
+]
+
+const INVESTING_SUB_ITEMS = [
+  { label: 'Big 5 Calculator', href: '/investing/calculator' },
+  { label: 'Watchlist', href: '/investing/watchlist' },
+  { label: 'Too Hard Pile', href: '/investing/too-hard' },
 ]
 
 interface SidebarProps {
@@ -34,6 +40,9 @@ interface SidebarProps {
 export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const [investingOpen, setInvestingOpen] = useState(false)
+
+  const isInvestingActive = pathname.startsWith('/investing')
 
   return (
     <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
@@ -75,6 +84,42 @@ export function Sidebar({ role }: SidebarProps) {
               </li>
             )
           })}
+
+          {/* Investing with collapsible sub-menu */}
+          <li>
+            <div className={`sidebar__nav-item sidebar__nav-item--expandable${isInvestingActive ? ' sidebar__nav-item--active' : ''}`}>
+              <Link
+                href="/investing"
+                className="sidebar__nav-item-main"
+                title={collapsed ? 'Investing' : undefined}
+              >
+                <span className="sidebar__nav-icon"><TrendingUp size={18} /></span>
+                <span className="sidebar__nav-label">Investing</span>
+              </Link>
+              <button
+                className={`sidebar__nav-caret${investingOpen ? ' sidebar__nav-caret--open' : ''}`}
+                onClick={() => setInvestingOpen((o) => !o)}
+                aria-label={investingOpen ? 'Collapse investing menu' : 'Expand investing menu'}
+              >
+                <ChevronDown size={14} />
+              </button>
+            </div>
+
+            {investingOpen && !collapsed && (
+              <ul className="sidebar__sub-nav">
+                {INVESTING_SUB_ITEMS.map((sub) => (
+                  <li key={sub.href}>
+                    <Link
+                      href={sub.href}
+                      className={`sidebar__sub-item${pathname === sub.href ? ' sidebar__sub-item--active' : ''}`}
+                    >
+                      {sub.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
         </ul>
       </nav>
 

@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
@@ -9,7 +10,9 @@ export default async function CalculatorPage() {
   return (
     <div className="page-container page-container--wide">
       <h1 className="page-title">Big 5 Calculator</h1>
-      <CalculatorClient isAdmin={session.user.role === 'admin'} />
+      <Suspense>
+        <CalculatorClient isAdmin={session.user.role === 'admin'} />
+      </Suspense>
     </div>
   )
 }
