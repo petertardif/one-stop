@@ -18,6 +18,10 @@ Authentication: email + password, JWT sessions via NextAuth.js. Role is stored o
 
 ---
 
+## App Shell & Responsiveness
+
+The authenticated shell ([app/(app)/layout.tsx](app/(app)/layout.tsx)) is a fixed sidebar + main column. On **desktop** the sidebar is a 240px column with an optional 60px rail-collapse. Below **768px** it becomes an off-canvas **drawer** opened by a hamburger in the Topbar's top-left; a backdrop, Escape, or navigating closes it, and body scroll locks while open. Shared open/close state lives in `components/MobileNavContext.tsx`. Phone-width content collapses (stat cards, form rows) use a **640px** breakpoint. Wide data tables keep their horizontal-scroll containers on mobile rather than reflowing to cards.
+
 ## Core Modules
 
 ### 1. Authentication (`/app/(auth)`)
@@ -64,7 +68,7 @@ The primary landing page after login. Provides an at-a-glance view of the family
 **Data Entry:**
 - `/dashboard/accounts/new` — add a new account (manual or Plaid-linked)
 - `/dashboard/accounts/[id]/edit` — edit account details or update balance
-- `/dashboard/transactions/new` — log an income or expense entry
+- Transactions are logged/edited from the **Ledger** (`/monthly`) via its Add/Edit modal — there is no separate dashboard transaction page.
 
 **Plaid Integration (optional per account):**
 - "Connect to bank" flow using Plaid Link widget
@@ -77,48 +81,249 @@ The primary landing page after login. Provides an at-a-glance view of the family
 
 A full transaction ledger showing credits and debits from the family's checking account and credit cards. Transactions are pulled from Plaid-connected accounts and stored locally. Manual entries (not tied to any bank account) can also be added.
 
-**Period selector** — toggleable filter:
+**Filters** render as compact pill/**chip dropdowns** (icon + value) inline in the controls row — a **Period** chip and a **Category** chip:
+
+**Period selector** — toggleable filter (**defaults to Last 3 Months**):
 - All time
 - Individual year (dynamically generated from existing data)
 - Last 6 months
 - Last 3 months
 - Individual month (with prev/next navigation)
 
-**Account filter** — tabs for All / Checking / each credit card account.
+**Account filter** — removed from the UI (there are no Plaid/bank accounts connected yet, so it only ever showed "All"). Re-introduce as a chip once Plaid accounts exist; the `account_id` filter still works server-side.
 
 **Transaction table columns:**
 
 | Column | Notes |
 |--------|-------|
+| ☑ | Row select checkbox (leftmost). Header checkbox = select-all (visible/filtered rows only). Disabled on non-manual/Plaid rows. Drives the toolbar Delete/Duplicate actions. |
 | Date | Editable date picker |
 | ✓ | Posted indicator (checkbox) |
-| Check # | Optional, for paper checks |
 | Category | Dropdown (predefined family categories) |
 | Description | Editable text |
 | Amount | Positive = credit (green), negative = debit (red) |
-| Balance | Running balance computed client-side |
-| Budget | Flag checkbox (tracks budget-relevant entries) |
-| Notes | Editable free text |
-| Source | Account name (shown in "All" view) |
+| Balance | Running checkbook balance, stored per row (`transactions.balance`) and shown in `seq` order; server-maintained on create/update/delete so period/account filters never recompute it |
+| Budget | Account dropdown (edit/new rows): **N/A** (null) · **Bank** · **Chase CC** · **BoA CC**. A settled row shows an icon: Bank → landmark (neutral); Chase CC → credit-card in Chase blue `#117ACA`; BoA CC → credit-card in BoA red `#E31837`; N/A → nothing. `budget_flagged` (= `budget_account IS NOT NULL`, kept in sync by the API) still marks "in the weekly budget" for the remaining card + 1K Weekly Balance column (all three accounts). |
+| 1K Weekly Balance | Per-week $1,000 allowance. Each week runs **Friday → Thursday**; every budget-flagged transaction in the week deducts from that week's $1,000 (resets to $1,000 each Friday). A week's base can be **topped up** (see below), so the effective allowance is `$1,000 + week top-ups`. Displayed on **every** row as the remaining allowance as of that row's position in its week (weeks with no flagged spend / top-ups show 1000.00). Computed server-side via a window function over the full ledger (never recomputed from the filtered subset). Independent of the regular Balance column — flagged transactions still hit Balance normally; the 1K weekly balance never affects Balance. |
+| Notes | Editable free text. In the read view, shown as a note icon only (when notes exist); hovering the icon reveals the full note text. **Check # lives here too**: there is no standalone Check # column — in edit/new rows the Notes cell stacks a check-# input above the notes input (placeholders "Add check # here" / "Add notes here"); in the read view a **banknote** icon appears beside the notes icon when a check # exists, its tooltip reading `#<number>`. (`transactions.check_number` is unchanged.) |
 
-**Edit behavior:** Click a row to edit in-place. Save on Enter/blur, cancel on Escape.
+(The `transactions.account_id`/Source is retained in the DB but no longer shown as a column.)
 
-**Plaid sync:** "Sync Accounts" button calls `/api/plaid/sync`. Plaid transactions cannot be deleted (only edited). Manual transactions can be deleted.
+**Add / Edit:** both use a **modal** (shared `RecordModal`), not inline rows — the row set grew too complex to edit in place. The row's edit (✎) button opens the modal pre-filled; `Add` opens it empty (new transactions are always manual — no account/source picker). Field order: Date · Posted (**defaults unchecked**) · Category · Budget account (**defaults to Chase CC**) · Description · Type (+ Credit / − Debit) · Amount (positive; Type sets the sign) · Check # · Notes. The **Amount** input is a **cash-register money field** — digits fill from the right as cents and the decimal is inserted automatically (`1234` → `12.34`). **Check # only shows when Budget account = Bank.** **Save is disabled until a non-zero Amount, a Category, and a Description are entered.** Closes on Save/Cancel/×/backdrop/Escape.
+
+**Toolbar actions:** `Mark as…`, `Duplicate`, `Delete`, `Add to 1k Weekly`, `Add` (right group). Buttons use the shared toolbar styling: `Add` is the filled primary; every other button (including `Delete`) is an accent-outline secondary. Every button carries an icon + label. **`Sync` is hidden** (gated behind `SHOW_SYNC` in `MonthlyLedger.tsx`) until Plaid + an account-setup flow exist; it will return to the left of the toolbar then.
+
+**Mobile controls:** below 768px the inline controls row collapses to a single **Filters** button that opens a modal containing the two filters (Period · Category) and the action buttons (Add to 1k Weekly · Add · Duplicate · Delete). **Sync Accounts is hidden on mobile.** Desktop is unchanged.
+
+**Pagination:** the ledger is **server-paginated**, newest-first. A footer below the table has a **Rows-per-page** dropdown (`100` default · `300` · `500` · `1000`), a `start–end of total` count, and page controls: **« First · ‹ Prev · windowed page numbers (with … ellipsis) · Next › · Last »**. Changing a filter or the page size resets to **page 1**; the page auto-clamps if the total shrinks (e.g. after a bulk delete). The running balance / 1K weekly balance are unaffected (computed server-side over the full ledger).
+
+**Bulk actions:** Row checkboxes drive several toolbar buttons, enabled once ≥1 row is selected:
+- **Delete** — opens a confirm modal ("You are about to delete X transactions. Do you want to proceed?"); on confirm, bulk-deletes the selected manual rows and re-shifts the running `balance` of later rows. Only manual rows are selectable (Plaid protected).
+- **Duplicate** — copies each selected row as a new **manual** transaction: all fields copied as-is, keeps the original date, description prefixed with `Copy of: `, appended to the ledger tail with a fresh `seq`/`balance`.
+- **Mark as…** — a dropdown menu (closes on pick / outside-click / Escape) that mass-updates **one field at a time** across the selected **manual** rows: **Posted** / **Unposted** (`is_posted`), then **Budget-N/A** / **Budget-Bank** / **Budget-Chase CC** / **Budget-BoA CC** (`budget_account`, with `budget_flagged` kept in sync). Neither field touches the running `balance`, so no re-shift.
+
+**Weekly budget top-up:** an **Add to a week** button on the $1,000 card opens a modal (amount + week dropdown — last 2 weeks, current, next 3). Each submission **raises** the chosen Fri→Thu week's allowance by the amount (e.g. $1,000 → $1,200). Stored in `weekly_budget_adjustments` (keyed by the Friday `week_start`); affects **only** the 1K weekly balance — it never creates a ledger row and never touches the checkbook `balance` column. The ledger window function and the current-week card both add the week's summed top-ups.
+
+**Plaid sync:** the "Sync" button (which calls `/api/plaid/sync`) is **hidden until Plaid is implemented with an account-setup flow** — there are no connected accounts yet, so syncing has nothing to do. Re-enable via `SHOW_SYNC = true` in `MonthlyLedger.tsx` once account connection exists. When live: Plaid transactions cannot be deleted (only edited); manual transactions can be deleted.
 
 **Categories:** FINANCIAL, MONTHLY BILLS, ENTERTAINMENT, GROCERIES, HOUSE, CAR, HEALTHCARE, KIDS, DOGS, TRAVEL, SHOPPING, ALCOHOL, RESTAURANT, TAKEOUT, GAS, GIFTS, KIDS SPORTS, JOB RELATED, XMAS, INCOME, OTHER
 
 **API routes:**
-- `GET /api/transactions?period=YYYY-MM&account_id=...` — fetch filtered transactions
+- `GET /api/transactions?period=YYYY-MM&category=...&account_id=...&page=1&pageSize=100&tz=IANA` — fetch filtered, **paginated** transactions. Period, **category**, and account filters are all applied **server-side**; results are **newest-first** and sliced by `page`/`pageSize` (`pageSize` restricted to `100|300|500|1000`, default 100). Returns `{ rows, total, page, pageSize }` where `total` is the full filtered count (`COUNT(*) OVER()`). The running `balance` + 1K weekly balance are still computed over the **full** ledger inside the CTE, so every page's figures stay correct. The relative `3m`/`6m` periods compute "N months ago" from **today in the client's timezone** (`tz`, e.g. `America/Denver`), not the DB's UTC.
 - `POST /api/transactions` — create manual transaction
 - `PUT /api/transactions/[id]` — update any field except `plaid_transaction_id`
 - `DELETE /api/transactions/[id]` — delete (manual only)
+- `POST /api/transactions/bulk-delete` — `{ ids: [] }`; delete manual rows, re-shift running balances (transactional)
+- `POST /api/transactions/bulk-duplicate` — `{ ids: [] }`; copy rows as manual, keep date, prefix description `Copy of: ` (transactional)
+- `POST /api/transactions/bulk-update` — `{ ids, field: 'is_posted'|'budget_account', value }`; mass "Mark as…" update of one field across selected manual rows (admin). `budget_account` also syncs `budget_flagged`; no `balance` impact
+- `GET /api/transactions/weekly-budget[?week_start=YYYY-MM-DD][&tz=IANA]` — for a Fri→Thu week (the given Friday, else the **current** week computed from today in the client's `tz`, not UTC), returns `remaining` (`$1,000 + week top-ups + spend across **all** budget accounts`) and `spent` (`ABS(SUM(amount))` over **Chase CC only**), independent of the ledger's period filter. Powers the two cards above the filter row: a fixed **current-week remaining** card (all accounts) and a **1k Budget Spent** total card (**Chase CC only**) whose own small week dropdown (last 2 / current / next 3, defaulting to current) selects the week to sum.
+- `POST /api/transactions/weekly-budget` — `{ week_start, amount }`; add a top-up to a week's 1K allowance (admin). Raises the weekly balance only; no ledger row, no checkbook impact.
 - `POST /api/plaid/link-token` — create Plaid Link token
 - `POST /api/plaid/exchange-token` — exchange public token, store access token, create account records
 - `POST /api/plaid/sync` — pull 90 days of transactions from Plaid, upsert by `plaid_transaction_id`
 
+### 3.1 Budget (`/app/budget`)
+
+A table of recurring budget line items (bills), under the Financials sidebar group. Admin read/write; partner/dependent read-only.
+
+**Columns:** select checkbox · Description · Category (free-form; predefined budget taxonomy + user-typed) · Due Date (day-of-month dropdown, 1–31) · Auto/Manual (header info icon; values Autopay | Manual) · Duration (Annual | Monthly | Bi-Weekly | Weekly) · Annual ($) · Monthly Average ($) · Next Monthly ($) · Actions.
+
+**One price per item**, entered at its native cadence. Derived:
+- `Annual = amount × { annual:1, monthly:12, biweekly:26, weekly:52 }`
+- `Next Monthly = Annual ÷ 12`
+- **Monthly Average** — a single figure (total row only): trailing-12-month net `MONTHLY BILLS` spend from the ledger ÷ 12.
+
+**Total row** sums Annual and Next Monthly; shows Monthly Average in its own cell.
+
+**Active/Archived tabs.** CRUD with **archive** (soft, `archived_at`) instead of delete; archived items restorable. Rows are click-to-edit inline; **Add** opens a modal (Description · Category · Due date · Auto/Manual · Duration · Price, with Next Monthly shown read-only), and Save is disabled until a description is entered.
+
+**Sorting / reordering / filtering:**
+- **Column sort** — click any data-column header (Description, Category, Due Date, Auto/Manual, Duration, Annual, Next Monthly) to sort asc → desc → back to manual order. Monthly Average (aggregate-only), the checkbox, and Actions are not sortable.
+- **Drag-to-reorder** — rows have a persisted manual order (`budget_items.sort_order`); drag a row to a new position to save it (`/api/budget-items/reorder`, optimistic). Enabled only in manual order with no active search/category filter/column sort.
+- **Search** — text box next to the Archived tab; filters by description or category.
+- **Category filter** — dropdown next to search; filters to a single category. Totals reflect the visible (filtered) rows.
+
+**Add to Ledger:** select items → posts each as a `transactions` row in **next month** on the item's **Due Date day** (clamped to the month's last day, e.g. 31 → Feb 28/29; no Due Date → 1st), category `MONTHLY BILLS`, amount = Next Monthly (expense), tagged with `budget_item_id`. **Deduped** by `(budget_item_id, month)` so a bill can't post twice per month; maintains ledger `seq`/`balance`.
+
+**API routes:**
+- `GET /api/budget-items?archived=` — items + `monthly_average`
+- `POST /api/budget-items` — create (admin)
+- `PUT /api/budget-items/[id]` — edit fields / archive / restore (admin)
+- `POST /api/budget-items/add-to-ledger` — post selected items to the ledger (admin)
+- `POST /api/budget-items/reorder` — `{ ids }` in new display order; rewrites `sort_order` (admin)
+
+### 3.2 Debts (`/app/debts`)
+
+A standalone debts tracker under the Financials sidebar group — **independent** of the Dashboard `accounts` / net worth. Admin read/write; partner/dependent read-only. Modeled on **Investments**: each debt is a parent account with a normalized dated **balance history** (`debt_snapshots`, one balance per date); the collapsed row shows the latest balance, and clicking a row expands its full history.
+
+**Three tabs** (default **Short Term**):
+- **Short Term** / **Long Term** — active (not paid off) debts of that term.
+- **Paid Off** — debts marked paid (nothing owed); inserts a **Type** (Short/Long) column so both terms are distinguishable. History is retained.
+
+**Charts (top of page, reflect the active tab's debts):**
+- **Total debt over time** (area) — for each snapshot date, sums every debt's **carry-forward** balance (its most recent snapshot on or before that date), so a debt you didn't update that day still counts at its last known balance. A debt contributes $0 to dates before its first snapshot.
+- **Allocation** (donut) — latest balance per debt, grouped by a **Category / Debt** toggle.
+- **Per-debt balance over time** (multi-line) — one line per debt across snapshot dates, each debt **carried forward** from its last snapshot (line stays flat until its next update; no line before its first snapshot). Legend shows the debt name, disambiguated with its category only when a name is shared.
+
+On the **Paid Off** tab both of these roll every short-term debt into a single **Short Term** series/slice (they are dozens of one-off line items), leaving long-term debts individual. Allocation there also measures each debt by its **Total Paid Off** (peak balance) rather than its latest balance, which is 0 for a paid-off debt.
+
+**Columns** (Short/Long): select checkbox · expand · Name · Category · Latest Balance · Change (vs prior snapshot; a **falling** balance is green, a rising one red) · Latest Date · Actions (edit ✎, Mark as Paid, delete). **Paid Off** renames **Latest Balance → Total Paid Off** (the peak/largest snapshot balance the debt ever carried = the full amount paid off — never a sum of snapshots; equals the amount for one-off items and the highest balance ever reached for long-term/credit-card debts), **drops the Change column**, inserts a **Type** column before Actions, and swaps Edit/Mark-as-Paid for **Restore**.
+
+- **Category** — free-form (predefined debt taxonomy: MORTGAGE, CAR LOAN, STUDENT LOAN, CREDIT CARD, PERSONAL LOAN, MEDICAL, TAXES, OTHER + user-typed).
+- Inline click-to-edit rows (name / category / term). `New Debt` opens a **modal** (Name · Category · Term · Balance · Balance date) whose **term is auto-set to the active tab** and whose **date defaults to today**; the balance is saved as the debt's **first snapshot** in the same transaction as the account. Save is disabled until a name is entered; leaving the balance blank creates the debt with no snapshots.
+- **Balance history** — expand a row to see all dated balances (admin can inline-edit a value or delete a snapshot). **Add snapshot date** (modal): pick a date, enter each debt's balance in one pass (upserts).
+- **Search / column sort / drag-reorder** (same controls as Investments, next to the tabs). Sorting any data column is view-only. **Drag-reorder** (Short/Long tabs, when unsorted/unsearched) persists a manual order via `debt_accounts.sort_order`.
+- **Totals footer** sums Latest Balance across the visible rows.
+
+**Toolbar** — Short/Long: `New Debt`, `Add snapshot date`, `Mark as Paid`, `Delete`. Paid Off: `Restore`, `Delete` (checkbox-driven; per-row actions also available).
+
+**API routes:**
+- `GET /api/debts` — all debt accounts (manual order) each with their snapshot series + distinct `categories`; client filters by tab
+- `POST /api/debts` — create account `{ name, category, term, balance?, as_of? }` (admin); appends to the tail. When `balance` is supplied it writes the debt's first `debt_snapshots` row (dated `as_of`, default `CURRENT_DATE`) in the same transaction
+- `PUT /api/debts/[id]` — edit name / category / term (admin)
+- `DELETE /api/debts/[id]` — delete account + its snapshots (admin, cascade)
+- `POST /api/debts/snapshots` — `{ as_of, values: [{ debt_account_id, balance }] }`; upsert balances for a date (null clears); powers the modal + inline edits (admin, transactional)
+- `DELETE /api/debts/snapshots/[id]` — delete a single balance cell (admin)
+- `POST /api/debts/mark-paid` — `{ ids }`; set `paid_at` (admin)
+- `POST /api/debts/restore` — `{ ids }`; clear `paid_at` (admin)
+- `POST /api/debts/reorder` — `{ ids }`; rewrite `sort_order` to the new display order (admin)
+
+### 3.3 Subscriptions (`/app/subscriptions`)
+
+A subscriptions ledger under the Financials sidebar group, mirroring the Debts page UI. Admin read/write; partner/dependent read-only. No running balance.
+
+**Two tabs** (default **Active**):
+- **Active** — current subscriptions.
+- **Cancelled** — subscriptions with a `cancelled_at` set; shows an added **Cancelled** date column.
+
+**Columns:** select checkbox · Category · Service · Company · Price/Year · Price/Month · Renewal · Actions. Cancelled tab inserts a **Cancelled** (date) column before Actions.
+
+- **Prices** are entered manually per cadence — Price/Year and Price/Month are independent (no derivation).
+- **Renewal** is structured via a cycle picker: **Monthly** → day-of-month (renders "Monthly - 1st"); **Annual** → a specific date.
+- **Category** — free-form (predefined: ENTERTAINMENT, STORAGE, FITNESS, FINANCIAL, GROCERIES, SUBSCRIPTION, TECHNOLOGY, OTHER + user-typed). Technology subs are just Category = TECHNOLOGY.
+- Inline click-to-edit rows; **Add** opens a modal (Service · Company · Category · Price/Year · Price/Month · Renewal cycle · Renewal day/date); Save is disabled until a service is entered.
+- **Search / column sort / drag-reorder / category filter** (same controls as Budget, next to the tabs). Sorting any data column is view-only. **Drag-reorder** (Active tab only, when unsorted/unfiltered) persists a manual order via `subscriptions.sort_order` (`/api/subscriptions/reorder`).
+- **Totals footer** sums Price/Year and Price/Month across the visible rows.
+
+**Toolbar** — Active: `Add`, `Mark as Cancelled`, `Duplicate`. Cancelled: `Restore`, `Delete` (checkbox-driven; Mark as Cancelled / Restore / Delete also available per-row). Duplicate copies active rows as new active rows (`Copy of: ` service prefix).
+
+**API routes:**
+- `GET /api/subscriptions?tab=active|cancelled` — rows for the tab + distinct `categories`
+- `POST /api/subscriptions` — create (admin)
+- `PUT /api/subscriptions/[id]` — edit fields (admin)
+- `DELETE /api/subscriptions/[id]` — delete a row (admin)
+- `POST /api/subscriptions/mark-cancelled` — `{ ids }`; set `cancelled_at` (admin)
+- `POST /api/subscriptions/restore` — `{ ids }`; clear `cancelled_at` (admin)
+- `POST /api/subscriptions/bulk-duplicate` — `{ ids }`; copy active rows (admin, transactional)
+- `POST /api/subscriptions/reorder` — `{ ids }`; rewrite `sort_order` to the new display order (admin)
+
+### 3.4 Auto (`/app/auto`)
+
+A vehicle service/maintenance log under the Financials sidebar group. Admin read/write; partner/dependent read-only. One row per service event; **no running balance** (costs are plain positive amounts).
+
+**No tabs.** Instead three filters sit in the controls row:
+- **Cars** — multiselect dropdown (checkbox list; empty = all cars). Options derived from existing rows.
+- **Years** — multiselect dropdown (empty = all years). Options derived from the year of each row's date.
+- **Search** — matches Car / Service Description / Service Performed by.
+
+**Columns:** select checkbox · Date · Car · Service Description · Cost · Service Performed by · Actions.
+
+- Every column except Actions is **sortable** (click header; asc → desc → back to manual order).
+- **Drag-to-reorder** rows (persisted via `sort_order`), available only when no sort/search/filter is active.
+- **Totals footer** sums Cost across the visible rows.
+- Inline click-to-edit rows (save/cancel icons); **Add** opens a modal (Date · Car · Service description · Cost · Service performed by); Save is disabled until a car and date are entered.
+
+**Toolbar** (admin): `Add`, `Duplicate`, `Delete` (checkbox-driven; per-row Edit / Duplicate / Delete also available). Duplicate copies rows with a `Copy of: ` description prefix, appended to the tail.
+
+**API routes:**
+- `GET /api/auto` — the full service log (car/year filters applied client-side)
+- `POST /api/auto` — create (admin); appends to the tail
+- `PUT /api/auto/[id]` — edit fields (admin)
+- `DELETE /api/auto/[id]` — delete a row (admin)
+- `POST /api/auto/bulk-duplicate` — `{ ids }`; copy rows (admin, transactional)
+- `POST /api/auto/reorder` — `{ ids }`; rewrite `sort_order` to the new display order (admin)
+
+### 3.5 Charitable Donations (`/app/donations`)
+
+A flat log of charitable donations the family **gives**, kept for tax records — the **last** link in the Financials sidebar group. Admin read/write; partner/dependent read-only. One row per donation; **no running balance** (amounts are plain positive numbers).
+
+**No tabs.** Controls row:
+- **Years** — multiselect dropdown (empty = all years). Options derived from the year of each row's date.
+- **Search** — matches Organization / Donor Name / Donor Contact Info / Notes.
+
+**Columns:** select checkbox · Date · Organization (recipient charity) · Donor Name · Donor Contact Info · Donation Amount · Payment Method (Cash | Non-cash) · Value of goods/services · Notes · Actions.
+
+- **Payment Method** — dropdown, `cash` | `non_cash` (in-kind). **Value of goods/services** captures any quid-pro-quo benefit received back (reduces the deductible amount).
+- Every data column is **sortable** (click header; asc → desc → back to manual order). No drag-reorder.
+- **Totals footer** sums Donation Amount and Value of goods/services across the visible rows.
+- Inline click-to-edit rows (save/cancel icons); **Add** opens a modal (Date · Organization · Donor name · Donor contact · Donation amount · Payment method · Value of goods/services · Notes); Save is disabled until an organization and date are entered.
+
+**Toolbar** (admin): `Add`, `Duplicate`, `Delete` (checkbox-driven; per-row Edit / Duplicate / Delete also available). Duplicate copies rows with a `Copy of: ` organization prefix, appended to the tail.
+
+**API routes:**
+- `GET /api/charitable-donations` — the full donation log (year filter applied client-side)
+- `POST /api/charitable-donations` — create (admin); appends to the tail
+- `PUT /api/charitable-donations/[id]` — edit fields (admin)
+- `DELETE /api/charitable-donations/[id]` — delete a row (admin)
+- `POST /api/charitable-donations/bulk-duplicate` — `{ ids }`; copy rows (admin, transactional)
+
+---
+
 ### 4. Rule #1 Investing (`/app/investing`)
 
 Research hub built around Phil Town's Rule #1 / value investing methodology. Accessible to Admin; optionally visible to Partner/Dependent (admin-configurable).
+
+#### Investments (`/investing/investments`)
+
+A portfolio tracker for the family's real accounts (retirement, college, savings) — the **first** link in the Investing sidebar submenu. Distinct from the Rule #1 research tools below. Admin read/write; partner/dependent read-only.
+
+Two data models: an `investments` account row (brokerage, type, owner "in whose name", type description, contribution cadence/amount/note, strategy) and a normalized `investment_snapshots` time series (one dated balance per account). Normalizing snapshots lets new valuation dates be added forever and powers the charts.
+
+**Active/Liquidated tabs** (default **Active**): **Liquidate** archives an account (sets `investments.liquidated_at`) without touching its snapshots. The **Active** tab shows non-liquidated accounts; the **Liquidated** tab shows liquidated ones and adds a **Liquidated** (date) column. **Both the charts and the summary/total below always reflect only the current tab's accounts** — the Active view excludes liquidated data entirely, and switching to Liquidated recomputes the charts from liquidated accounts only.
+
+**Charts (top of page):**
+- **Portfolio value over time** (area chart, top-left) — for each snapshot date, sums every account's **carry-forward** value (its most recent snapshot on or before that date), so an account you didn't update that day still counts at its last known value. An account contributes $0 to dates before its first snapshot.
+- **Allocation** (donut, top-right) — latest value per account grouped by a **Type / Owner** toggle.
+- **Per-account growth** (multi-line, full width below) — one line per account across snapshot dates, each account **carried forward** from its last snapshot (flat until its next update; no line before its first snapshot).
+
+**Summary table** (one row per account, click to expand):
+- Columns: select checkbox · expand · Brokerage · Type · Owner · Description · Contribution (cadence · amount, note flagged with `*`) · Latest Value · Change (vs. prior snapshot, green/red) · *(Liquidated tab only: Liquidated date)* · Actions.
+- **Search** (brokerage/type/owner/description), **column sort** (asc → desc → manual), **drag-to-reorder** (persisted `investments.sort_order`, Active tab only when unsorted/unsearched).
+- **Total row** sums Latest Value across visible rows.
+- **Expand a row** → balance history (all snapshots, admin can inline-edit a value or delete a snapshot) + strategy notes.
+
+**Toolbar (admin):** Active tab — `New Investment` (inline new account row) · `Add snapshot date` (modal: pick a date, enter each account's balance in one pass — upserts) · `Liquidate` · `Delete` (all checkbox-driven; per-row Edit/Liquidate/Delete also available). Liquidated tab — `Restore` (checkbox-driven; per-row Restore also available).
+
+**API routes:**
+- `GET /api/investments` — accounts (manual order) each with their snapshot series, plus distinct snapshot dates
+- `POST /api/investments` — create account (admin); appends to the tail
+- `PUT /api/investments/[id]` — edit account fields (admin)
+- `DELETE /api/investments/[id]` — delete account + its snapshots (admin, cascade)
+- `POST /api/investments/snapshots` — `{ as_of, values: [{ investment_id, value }] }`; upsert balances for a date (null clears); powers the modal + inline edits (admin, transactional)
+- `DELETE /api/investments/snapshots/[id]` — delete a single snapshot cell (admin)
+- `POST /api/investments/reorder` — `{ ids }`; rewrite `sort_order` to the new display order (admin)
+- `POST /api/investments/liquidate` — `{ ids }`; set `liquidated_at = NOW()` (admin)
+- `POST /api/investments/restore` — `{ ids }`; clear `liquidated_at` (admin)
 
 #### Big 5 Numbers Calculator (`/investing/calculator`)
 
@@ -265,7 +470,16 @@ users               id, email, password_hash, role (admin|partner|dependent), cr
 user_profiles       id, user_id (FK), first_name, last_name, date_of_birth, phone, address_line1, address_line2, city, state, postal_code, country, avatar_url (nullable), created_at, updated_at
 plaid_items         id, user_id (FK), access_token, item_id (unique), institution_name, created_at, updated_at
 accounts            id, user_id (FK), name, institution, type (checking|savings|investment|brokerage|retirement|real_estate|credit_card|mortgage|car_loan|student_loan|other_debt), balance, currency, plaid_account_id (nullable, unique), plaid_item_id (FK nullable), last_synced_at, created_at, updated_at
-transactions        id, user_id (FK), account_id (FK nullable), plaid_transaction_id (nullable, unique), is_manual, amount, type (income|expense), category, description, check_number (nullable), date, is_posted, budget_flagged, notes, created_at, updated_at
+transactions        id, user_id (FK), account_id (FK nullable), plaid_transaction_id (nullable, unique), is_manual, seq (bigint, ledger order), amount, type (income|expense), category, description, check_number (nullable), date, is_posted, budget_flagged (bool — in the weekly budget; kept = budget_account IS NOT NULL), budget_account (nullable — bank|chase_cc|boa_cc; null = N/A), balance (running checkbook balance), notes, budget_item_id (FK budget_items nullable — set when posted via Budget "Add to Ledger"), created_at, updated_at
+weekly_budget_adjustments id, user_id (FK), week_start (date — Friday that starts the Fri→Thu week), amount (numeric, signed — raises/lowers that week's 1K allowance), created_at, updated_at
+budget_items        id, user_id (FK), description, due_date (text, day-of-month "1"–"31"), pay_type (autopay|manual), duration (annual|monthly|biweekly|weekly), amount (native-cadence price), category (text, nullable — free-form budget taxonomy), sort_order (int — persisted manual drag order), archived_at (nullable, soft-archive), created_at, updated_at
+debt_accounts       id, user_id (FK), name, category (text, nullable — free-form debt taxonomy), term (short|long), sort_order (int — persisted manual drag order), paid_at (nullable — set = Paid Off tab), created_at, updated_at
+debt_snapshots      id, debt_account_id (FK, cascade), as_of (date), balance (numeric), created_at, updated_at — UNIQUE (debt_account_id, as_of)
+subscriptions       id, user_id (FK), category (text, nullable — free-form), service, company (nullable), price_per_year (nullable), price_per_month (nullable), renewal_cycle (monthly|annual), renewal_day (int 1–31, nullable — monthly), renewal_date (date, nullable — annual), sort_order (int — persisted manual drag order), cancelled_at (nullable — set = Cancelled tab), created_at, updated_at
+auto_services       id, user_id (FK), date, car, description (nullable), cost (numeric, positive), performed_by (nullable), sort_order (int — persisted manual drag order), created_at, updated_at
+charitable_donations id, user_id (FK), date, organization (nullable — recipient charity), donor_name (nullable), donor_contact (nullable), amount (numeric, positive), payment_method (cash|non_cash), goods_services_value (numeric, nullable — quid-pro-quo value received), notes (nullable), sort_order (int — default order), created_at, updated_at
+investments         id, user_id (FK), brokerage, type (nullable — Retirement|College|Savings, free-form), owner (nullable — "in whose name"), type_description (nullable), contribution_cadence (none|weekly|biweekly|monthly|annual), contribution_amount (numeric, nullable), contribution_note (nullable), strategy (nullable), sort_order (int — persisted manual drag order), liquidated_at (nullable — set = Liquidated tab), created_at, updated_at
+investment_snapshots id, investment_id (FK, cascade), as_of (date), value (numeric), created_at, updated_at — UNIQUE (investment_id, as_of)
 stocks              id, ticker, company_name, sector, created_at, updated_at
 watchlist_entries   id, user_id (FK), stock_id (FK), sticker_price, mos_price, growth_rate_used, big5_data (jsonb), added_at, updated_at
 four_ms_entries     id, watchlist_entry_id (FK), meaning_notes, moat_type, moat_notes, management_notes, mos_notes, created_at, updated_at
@@ -286,9 +500,9 @@ contacts            id, name, role, firm, phone, email, notes, created_at, updat
 /dashboard
 /dashboard/accounts/new
 /dashboard/accounts/[id]/edit
-/dashboard/transactions/new
 
 /investing
+/investing/investments        (Investing submenu, first item — portfolio tracker w/ charts)
 /investing/calculator
 /investing/watchlist
 /investing/watchlist/[ticker]
@@ -300,7 +514,12 @@ contacts            id, name, role, firm, phone, email, notes, created_at, updat
 /contingency/vault/[category]
 /contingency/print
 
-/monthly
+/monthly                     (sidebar "Financials" > "Ledger")
+/budget                      (Financials > "Budget" — line-item budget table)
+/debts                       (Financials > "Debts" — Short Term / Long Term / Paid Off ledger)
+/subscriptions               (Financials > "Subscriptions" — Active / Cancelled ledger)
+/auto                        (Financials > "Auto" — vehicle service log w/ car/year filters)
+/donations                   (Financials > "Charitable Donations" — donation log w/ year filter)
 
 /settings                    (admin only — invite partner/dependent, manage roles, Plaid setup)
 ```

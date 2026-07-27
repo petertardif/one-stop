@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ErrorMessage } from '@/components/ErrorMessage'
+import { useBusyWhile } from '@/components/BusyOverlay'
 
 const MOAT_TYPES = ['brand', 'switching', 'toll', 'cost', 'secret'] as const
 type MoatType = typeof MOAT_TYPES[number]
@@ -30,6 +31,7 @@ export function FourMsSetupClient({ ticker, companyName }: Props) {
     mos_notes: '',
   })
   const [saving, setSaving] = useState(false)
+  useBusyWhile(saving)
   const [error, setError] = useState<string | null>(null)
 
   function toggleMoat(t: MoatType) {

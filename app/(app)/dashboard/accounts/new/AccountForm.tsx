@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { ErrorMessage } from '@/components/ErrorMessage'
+import { useBusyWhile } from '@/components/BusyOverlay'
 
 const ACCOUNT_TYPES = [
   { value: 'checking', label: 'Checking' },
@@ -77,6 +78,8 @@ export function AccountForm({ mode, account }: AccountFormProps) {
 
   const watchedType = watch('type')
   const isDebt = DEBT_TYPES.includes(watchedType)
+
+  useBusyWhile(isSubmitting)
 
   async function onSubmit(values: FormValues) {
     setServerError(null)

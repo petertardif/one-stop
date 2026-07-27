@@ -4,6 +4,8 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Pencil, X } from 'lucide-react'
 import { ErrorMessage } from '@/components/ErrorMessage'
+import { useBusyWhile } from '@/components/BusyOverlay'
+import { Tooltip } from '@/components/Tooltip'
 
 interface Props {
   ticker: string
@@ -17,6 +19,7 @@ export function EditStockInfoButton({ ticker, initialName, initialSector }: Prop
   const [name, setName] = useState(initialName)
   const [sector, setSector] = useState(initialSector)
   const [saving, setSaving] = useState(false)
+  useBusyWhile(saving)
   const [error, setError] = useState<string | null>(null)
 
   function openModal() {
@@ -51,9 +54,11 @@ export function EditStockInfoButton({ ticker, initialName, initialSector }: Prop
 
   return (
     <>
-      <button className="btn-icon" onClick={openModal} title="Edit name and sector" aria-label="Edit stock info">
-        <Pencil size={14} />
-      </button>
+      <Tooltip text="Edit name and sector">
+        <button className="btn-icon" onClick={openModal} aria-label="Edit stock info">
+          <Pencil size={14} />
+        </button>
+      </Tooltip>
 
       <dialog
         ref={dialogRef}

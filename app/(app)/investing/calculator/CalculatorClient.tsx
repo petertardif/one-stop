@@ -9,6 +9,8 @@ import { InvestingError } from '@/components/investing/InvestingError'
 import { calcSticker } from '@/lib/indicators'
 import { Spinner } from '@/components/Spinner'
 import { ErrorMessage } from '@/components/ErrorMessage'
+import { useBusyWhile } from '@/components/BusyOverlay'
+import { Tooltip } from '@/components/Tooltip'
 
 type CalcStatus = 'idle' | 'loading' | 'api-success' | 'api-refresh-success' | 'api-failure' | 'saved'
 
@@ -147,6 +149,7 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
   const [growthOverride, setGrowthOverride] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  useBusyWhile(saving)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
   const [refreshError, setRefreshError] = useState<string | null>(null)
@@ -597,12 +600,11 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
                     ) : (
                       <span className="growth-override__default">
                         {' '}(10yr EPS growth)
-                        <span
-                          className="growth-override__info"
-                          title="Enter an Analyst EPS Growth estimate in the form above to apply Phil Town's conservative min() method"
-                        >
-                          <Info size={13} />
-                        </span>
+                        <Tooltip text="Enter an Analyst EPS Growth estimate in the form above to apply Phil Town's conservative min() method">
+                          <span className="growth-override__info">
+                            <Info size={13} />
+                          </span>
+                        </Tooltip>
                       </span>
                     )}
                   </label>
@@ -640,7 +642,7 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
                 <Save size={15} /> {saving ? 'Saving…' : 'Save'}
               </button>
               <button className="btn-primary" onClick={saveAndNext} disabled={saving}>
-                Save and Next <ChevronRight size={15} />
+                {saving ? 'Saving…' : <>Save and Next <ChevronRight size={15} /></>}
               </button>
             </div>
           )}

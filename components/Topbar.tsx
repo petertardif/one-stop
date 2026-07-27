@@ -3,7 +3,8 @@
 import { signOut } from 'next-auth/react'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { LogOut, Settings, Camera } from 'lucide-react'
+import { LogOut, Settings, Camera, Menu } from 'lucide-react'
+import { useMobileNav } from '@/components/MobileNavContext'
 
 interface TopbarProps {
   firstName: string
@@ -12,6 +13,7 @@ interface TopbarProps {
 }
 
 export function Topbar({ firstName, email, avatarUrl: initialAvatarUrl }: TopbarProps) {
+  const { toggle: toggleMobileNav } = useMobileNav()
   const [open, setOpen] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatarUrl)
   const [uploading, setUploading] = useState(false)
@@ -56,7 +58,13 @@ export function Topbar({ firstName, email, avatarUrl: initialAvatarUrl }: Topbar
 
   return (
     <header className="topbar">
-      <div />
+      <button
+        className="topbar__hamburger"
+        onClick={toggleMobileNav}
+        aria-label="Open menu"
+      >
+        <Menu size={22} />
+      </button>
 
       {uploadError && (
         <p className="topbar__upload-error">{uploadError}</p>

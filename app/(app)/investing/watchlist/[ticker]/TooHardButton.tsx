@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { X } from 'lucide-react'
 import { ErrorMessage } from '@/components/ErrorMessage'
+import { useBusyWhile } from '@/components/BusyOverlay'
 
 interface Props {
   ticker: string
@@ -15,6 +16,7 @@ export function TooHardButton({ ticker, companyName }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [reason, setReason] = useState('')
   const [moving, setMoving] = useState(false)
+  useBusyWhile(moving)
   const [error, setError] = useState<string | null>(null)
 
   function openModal() {

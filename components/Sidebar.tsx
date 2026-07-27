@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
+import { useMobileNav } from '@/components/MobileNavContext'
 import {
   LayoutDashboard,
-  Receipt,
+  Wallet,
   TrendingUp,
   Heart,
   Settings,
@@ -21,13 +22,29 @@ interface NavItem {
   icon: React.ReactNode
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={18} /> },
-  { label: 'Monthly Budget', href: '/monthly', icon: <Receipt size={18} /> },
-  { label: 'In Case I Die', href: '/contingency', icon: <Heart size={18} /> },
+const DASHBOARD_ITEM: NavItem = {
+  label: 'Dashboard',
+  href: '/dashboard',
+  icon: <LayoutDashboard size={18} />,
+}
+
+const CONTINGENCY_ITEM: NavItem = {
+  label: 'In Case I Die',
+  href: '/contingency',
+  icon: <Heart size={18} />,
+}
+
+const FINANCIALS_SUB_ITEMS = [
+  { label: 'Ledger', href: '/monthly' },
+  { label: 'Budget', href: '/budget' },
+  { label: 'Debts', href: '/debts' },
+  { label: 'Subscriptions', href: '/subscriptions' },
+  { label: 'Auto', href: '/auto' },
+  { label: 'Charitable Donations', href: '/donations' },
 ]
 
 const INVESTING_SUB_ITEMS = [
+  { label: 'Investments', href: '/investing/investments' },
   { label: 'Big 5 Calculator', href: '/investing/calculator' },
   { label: 'Watchlist', href: '/investing/watchlist' },
   { label: 'Too Hard Pile', href: '/investing/too-hard' },
@@ -39,13 +56,34 @@ interface SidebarProps {
 
 export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname()
+  const { open: mobileOpen, setOpen: setMobileOpen } = useMobileNav()
   const [collapsed, setCollapsed] = useState(false)
+  const isFinancialsActive = FINANCIALS_SUB_ITEMS.some(
+    (s) => pathname === s.href || pathname.startsWith(s.href + '/')
+  )
+  const [financialsOpen, setFinancialsOpen] = useState(isFinancialsActive)
   const [investingOpen, setInvestingOpen] = useState(false)
 
-  const isInvestingActive = pathname.startsWith('/investing')
+  // Close the mobile drawer whenever navigation occurs.
+  useEffect(() => { setMobileOpen(false) }, [pathname, setMobileOpen])
+
+  // While the drawer is open: lock body scroll and close on Escape.
+  useEffect(() => {
+    if (!mobileOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobileOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prev
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [mobileOpen, setMobileOpen])
 
   return (
-    <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
+    <>
+      {mobileOpen && <div className="sidebar-backdrop" onClick={() => setMobileOpen(false)} />}
+      <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}${mobileOpen ? ' sidebar--mobile-open' : ''}`}>
       <Link href="/dashboard" className="sidebar__header">
         <Image src="/logo-forest.svg" alt="One Stop" width={28} height={28} className="sidebar__logo-icon" />
         <span className="sidebar__logo-text">One Stop</span>
@@ -69,25 +107,69 @@ export function Sidebar({ role }: SidebarProps) {
             <hr className="sidebar__divider" />
           </li>
 
-          {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={`sidebar__nav-item${isActive ? ' sidebar__nav-item--active' : ''}`}
-                  title={collapsed ? item.label : undefined}
-                >
-                  <span className="sidebar__nav-icon">{item.icon}</span>
-                  <span className="sidebar__nav-label">{item.label}</span>
-                </Link>
-              </li>
-            )
-          })}
+          {/* Dashboard */}
+          <li>
+            <Link
+              href={DASHBOARD_ITEM.href}
+              className={`sidebar__nav-item${pathname === DASHBOARD_ITEM.href || pathname.startsWith(DASHBOARD_ITEM.href + '/') ? ' sidebar__nav-item--active' : ''}`}
+              title={collapsed ? DASHBOARD_ITEM.label : undefined}
+            >
+              <span className="sidebar__nav-icon">{DASHBOARD_ITEM.icon}</span>
+              <span className="sidebar__nav-label">{DASHBOARD_ITEM.label}</span>
+            </Link>
+          </li>
+
+          {/* Financials with collapsible sub-menu */}
+          <li>
+            <div className="sidebar__nav-item sidebar__nav-item--expandable">
+              <button
+                className="sidebar__nav-item-main"
+                onClick={() => setFinancialsOpen((o) => !o)}
+                title={collapsed ? 'Financials' : undefined}
+              >
+                <span className="sidebar__nav-icon"><Wallet size={18} /></span>
+                <span className="sidebar__nav-label">Financials</span>
+              </button>
+              <button
+                className={`sidebar__nav-caret${financialsOpen ? ' sidebar__nav-caret--open' : ''}`}
+                onClick={() => setFinancialsOpen((o) => !o)}
+                aria-label={financialsOpen ? 'Collapse financials menu' : 'Expand financials menu'}
+              >
+                <ChevronDown size={14} />
+              </button>
+            </div>
+
+            {financialsOpen && !collapsed && (
+              <ul className="sidebar__sub-nav">
+                {FINANCIALS_SUB_ITEMS.map((sub) => (
+                  <li key={sub.href}>
+                    <Link
+                      href={sub.href}
+                      className={`sidebar__sub-item${pathname === sub.href ? ' sidebar__sub-item--active' : ''}`}
+                    >
+                      {sub.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+
+          {/* In Case I Die */}
+          <li>
+            <Link
+              href={CONTINGENCY_ITEM.href}
+              className={`sidebar__nav-item${pathname === CONTINGENCY_ITEM.href || pathname.startsWith(CONTINGENCY_ITEM.href + '/') ? ' sidebar__nav-item--active' : ''}`}
+              title={collapsed ? CONTINGENCY_ITEM.label : undefined}
+            >
+              <span className="sidebar__nav-icon">{CONTINGENCY_ITEM.icon}</span>
+              <span className="sidebar__nav-label">{CONTINGENCY_ITEM.label}</span>
+            </Link>
+          </li>
 
           {/* Investing with collapsible sub-menu */}
           <li>
-            <div className={`sidebar__nav-item sidebar__nav-item--expandable${isInvestingActive ? ' sidebar__nav-item--active' : ''}`}>
+            <div className={`sidebar__nav-item sidebar__nav-item--expandable${pathname === '/investing' ? ' sidebar__nav-item--active' : ''}`}>
               <Link
                 href="/investing"
                 className="sidebar__nav-item-main"
@@ -137,5 +219,6 @@ export function Sidebar({ role }: SidebarProps) {
         </div>
       )}
     </aside>
+    </>
   )
 }

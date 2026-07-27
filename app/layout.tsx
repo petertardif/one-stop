@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { Providers } from '@/components/Providers'
@@ -8,6 +8,11 @@ export const metadata: Metadata = {
   title: 'One Stop',
   description: 'A private, family-focused financial hub.',
   manifest: '/manifest.webmanifest',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 }
 
 export default async function RootLayout({
