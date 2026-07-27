@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, ShieldAlert } from 'lucide-react'
 import { ErrorMessage } from '@/components/ErrorMessage'
+import { useBusyWhile } from '@/components/BusyOverlay'
+import { Tooltip } from '@/components/Tooltip'
 
 export interface VaultEntry {
   id: string
@@ -46,6 +48,7 @@ function EntryForm({
     Object.fromEntries(fieldDefs.map((f) => [f.key, entry.fields?.[f.key] ?? '']))
   )
   const [saving, setSaving] = useState(false)
+  useBusyWhile(saving)
   const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit() {
@@ -188,12 +191,16 @@ export function VaultCategoryClient({ initialEntries, categoryLabel, categorySlu
                   </button>
                   {isAdmin && (
                     <>
-                      <button className="btn-icon" onClick={() => setEditingId(entry.id)} title="Edit">
-                        <Pencil size={13} />
-                      </button>
-                      <button className="btn-icon btn-icon--danger" onClick={() => handleDelete(entry.id)} title="Delete">
-                        <Trash2 size={13} />
-                      </button>
+                      <Tooltip text="Edit">
+                        <button className="btn-icon" onClick={() => setEditingId(entry.id)}>
+                          <Pencil size={13} />
+                        </button>
+                      </Tooltip>
+                      <Tooltip text="Delete">
+                        <button className="btn-icon btn-icon--danger" onClick={() => handleDelete(entry.id)}>
+                          <Trash2 size={13} />
+                        </button>
+                      </Tooltip>
                     </>
                   )}
                 </div>

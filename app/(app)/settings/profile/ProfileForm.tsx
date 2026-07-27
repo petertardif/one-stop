@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useRouter } from 'next/navigation'
 import { ErrorMessage } from '@/components/ErrorMessage'
+import { useToast } from '@/components/Toast'
+import { useBusyWhile } from '@/components/BusyOverlay'
 
 function isRealPastDate(val: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) return false
@@ -56,9 +58,23 @@ interface Profile {
   country: string
 }
 
-export function ProfileForm({ profile }: { profile: Profile | null }) {
+export function ProfileForm({
+  profile,
+  requireProfile = false,
+}: {
+  profile: Profile | null
+  requireProfile?: boolean
+}) {
   const router = useRouter()
+  const { showToast } = useToast()
   const [serverError, setServerError] = useState<string | null>(null)
+  const isFirstTime = !profile?.first_name
+
+  useEffect(() => {
+    if (requireProfile) {
+      showToast('Please save your personal information before accessing the dashboard.', 'info')
+    }
+  }, [requireProfile, showToast])
 
   const {
     register,
@@ -79,6 +95,8 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
       country: profile?.country ?? 'US',
     },
   })
+
+  useBusyWhile(isSubmitting)
 
   async function onSubmit(values: FormValues) {
     setServerError(null)
@@ -104,7 +122,13 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
       return
     }
 
-    router.push('/dashboard')
+    showToast('Settings saved successfully.', 'success')
+
+    if (isFirstTime) {
+      router.push('/dashboard')
+    } else {
+      router.refresh()
+    }
   }
 
   return (

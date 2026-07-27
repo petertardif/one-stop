@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Send, X, ChevronDown, AlertTriangle } from 'lucide-react'
 import { ErrorMessage } from '@/components/ErrorMessage'
+import { useBusyWhile } from '@/components/BusyOverlay'
+import { Tooltip } from '@/components/Tooltip'
 
 type Role = 'partner_admin' | 'partner' | 'dependent'
 
@@ -56,6 +58,7 @@ export function InviteSection({ invites, defaultRole }: Props) {
   const [showLink, setShowLink] = useState(false)
   const [copied, setCopied] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  useBusyWhile(submitting)
   const [conflict, setConflict] = useState<RoleConflict | null>(null)
   const [duplicateEmail, setDuplicateEmail] = useState<string | null>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -249,15 +252,15 @@ export function InviteSection({ invites, defaultRole }: Props) {
             <label>Role <span className="field-required">*</span></label>
             <div className="role-pills">
               {ROLES.map((r) => (
-                <button
-                  key={r.value}
-                  type="button"
-                  title={r.tooltip}
-                  className={`role-pill${selectedRole === r.value ? ' role-pill--selected' : ''}`}
-                  onClick={() => { setSelectedRole(r.value); setConflict(null) }}
-                >
-                  {r.label}
-                </button>
+                <Tooltip key={r.value} text={r.tooltip}>
+                  <button
+                    type="button"
+                    className={`role-pill${selectedRole === r.value ? ' role-pill--selected' : ''}`}
+                    onClick={() => { setSelectedRole(r.value); setConflict(null) }}
+                  >
+                    {r.label}
+                  </button>
+                </Tooltip>
               ))}
             </div>
           </div>

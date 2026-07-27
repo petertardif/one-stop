@@ -8,7 +8,7 @@ import {
   Line,
   XAxis,
   YAxis,
-  Tooltip,
+  Tooltip as ChartTooltip,
   ResponsiveContainer,
   Cell,
   ReferenceLine,
@@ -18,6 +18,7 @@ import { Pencil, Plus, Check, X } from 'lucide-react'
 import { useState, useRef } from 'react'
 import { Spinner } from '@/components/Spinner'
 import { PlaidLinkButton } from '@/components/PlaidLinkButton'
+import { Tooltip } from '@/components/Tooltip'
 
 interface Account {
   id: string
@@ -168,7 +169,7 @@ export function DashboardClient({ firstName, isAdmin }: { firstName: string; isA
                   tickLine={false}
                 />
                 <ReferenceLine y={0} stroke="var(--surface-border)" />
-                <Tooltip
+                <ChartTooltip
                   formatter={(v) => fmt(Number(v))}
                   labelFormatter={(l) => l}
                   contentStyle={{ border: '1px solid var(--surface-border)', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
@@ -236,12 +237,16 @@ export function DashboardClient({ firstName, isAdmin }: { firstName: string; isA
                               if (e.key === 'Escape') setEditingBalance(null)
                             }}
                           />
-                          <button className="btn-icon" title="Save" onClick={() => saveBalance(acct.id, balanceInputRef.current?.value ?? '')}>
-                            <Check size={13} />
-                          </button>
-                          <button className="btn-icon" title="Cancel" onClick={() => setEditingBalance(null)}>
-                            <X size={13} />
-                          </button>
+                          <Tooltip text="Save">
+                            <button className="btn-icon" onClick={() => saveBalance(acct.id, balanceInputRef.current?.value ?? '')}>
+                              <Check size={13} />
+                            </button>
+                          </Tooltip>
+                          <Tooltip text="Cancel">
+                            <button className="btn-icon" onClick={() => setEditingBalance(null)}>
+                              <X size={13} />
+                            </button>
+                          </Tooltip>
                         </div>
                       ) : (
                         <>
@@ -252,13 +257,14 @@ export function DashboardClient({ firstName, isAdmin }: { firstName: string; isA
                             <span className="account-row__synced">Synced {fmtDate(acct.last_synced_at)}</span>
                           )}
                           {isAdmin && (
-                            <button
-                              className="account-row__edit"
-                              title="Update balance"
-                              onClick={() => setEditingBalance(acct.id)}
-                            >
-                              <Pencil size={13} />
-                            </button>
+                            <Tooltip text="Update balance">
+                              <button
+                                className="account-row__edit"
+                                onClick={() => setEditingBalance(acct.id)}
+                              >
+                                <Pencil size={13} />
+                              </button>
+                            </Tooltip>
                           )}
                         </>
                       )}
@@ -294,7 +300,7 @@ export function DashboardClient({ firstName, isAdmin }: { firstName: string; isA
                   <BarChart data={cashFlowChartData} barCategoryGap="40%">
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--text-secondary)' }} />
                     <YAxis hide />
-                    <Tooltip
+                    <ChartTooltip
                       formatter={(v) => fmt(Number(v))}
                       contentStyle={{ border: '1px solid var(--surface-border)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}
                     />
@@ -310,34 +316,28 @@ export function DashboardClient({ firstName, isAdmin }: { firstName: string; isA
             )}
           </section>
 
-          {isAdmin && (
-            <div className="dashboard__action-row">
-              <Link href="/dashboard/transactions/new" className="btn-sm btn-secondary">
-                <Plus size={14} /> Log transaction
-              </Link>
-            </div>
-          )}
-
           {/* Debt Snapshot */}
           <section className="dashboard__section">
             <div className="dashboard__section-header">
               <h2 className="dashboard__section-title">Debt Snapshot</h2>
               {debts.length > 0 && (
                 <div className="payoff-toggle">
-                  <button
-                    className={`payoff-toggle__btn${payoffMethod === 'avalanche' ? ' payoff-toggle__btn--active' : ''}`}
-                    onClick={() => setPayoffMethod('avalanche')}
-                    title="Highest interest rate first"
-                  >
-                    Avalanche
-                  </button>
-                  <button
-                    className={`payoff-toggle__btn${payoffMethod === 'snowball' ? ' payoff-toggle__btn--active' : ''}`}
-                    onClick={() => setPayoffMethod('snowball')}
-                    title="Lowest balance first"
-                  >
-                    Snowball
-                  </button>
+                  <Tooltip text="Highest interest rate first">
+                    <button
+                      className={`payoff-toggle__btn${payoffMethod === 'avalanche' ? ' payoff-toggle__btn--active' : ''}`}
+                      onClick={() => setPayoffMethod('avalanche')}
+                    >
+                      Avalanche
+                    </button>
+                  </Tooltip>
+                  <Tooltip text="Lowest balance first">
+                    <button
+                      className={`payoff-toggle__btn${payoffMethod === 'snowball' ? ' payoff-toggle__btn--active' : ''}`}
+                      onClick={() => setPayoffMethod('snowball')}
+                    >
+                      Snowball
+                    </button>
+                  </Tooltip>
                 </div>
               )}
             </div>
@@ -351,6 +351,7 @@ export function DashboardClient({ firstName, isAdmin }: { firstName: string; isA
                     </span>
                   </div>
                 </div>
+                <div className="ledger-table-wrap">
                 <table className="debt-table">
                   <thead>
                     <tr>
@@ -379,6 +380,7 @@ export function DashboardClient({ firstName, isAdmin }: { firstName: string; isA
                     ))}
                   </tbody>
                 </table>
+                </div>
                 <p className="debt-method-hint">
                   {payoffMethod === 'avalanche'
                     ? 'Avalanche: pay minimums on all, put extra toward highest-rate debt first. Saves the most interest.'

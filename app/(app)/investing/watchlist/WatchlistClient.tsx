@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Trash2 } from 'lucide-react'
 import { StatusBadge } from '@/components/investing/StatusBadge'
+import { Tooltip } from '@/components/Tooltip'
 
 export interface WatchlistRow {
   id: string
@@ -106,14 +107,15 @@ export function WatchlistClient({ initialRows, isAdmin }: { initialRows: Watchli
               </td>
               {isAdmin && (
                 <td>
-                  <button
-                    className="btn-icon btn-icon--danger"
-                    onClick={() => handleDelete(row.ticker)}
-                    disabled={deleting === row.ticker}
-                    title="Remove from watchlist"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <Tooltip text="Remove from watchlist">
+                    <button
+                      className="btn-icon btn-icon--danger"
+                      onClick={() => handleDelete(row.ticker)}
+                      disabled={deleting === row.ticker}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </Tooltip>
                 </td>
               )}
             </tr>

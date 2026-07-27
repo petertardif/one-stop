@@ -17,7 +17,11 @@ interface ProfileRow {
   country: string
 }
 
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams: { requireProfile?: string }
+}) {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
 
@@ -33,7 +37,7 @@ export default async function ProfilePage() {
   return (
     <main className="settings-page">
       <h1>Profile</h1>
-      <ProfileForm profile={profile} />
+      <ProfileForm profile={profile} requireProfile={searchParams.requireProfile === '1'} />
     </main>
   )
 }

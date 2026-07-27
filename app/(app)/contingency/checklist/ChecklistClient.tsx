@@ -4,6 +4,8 @@ import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Pencil, Trash2, ChevronDown } from 'lucide-react'
 import type { ChecklistItem } from './page'
+import { useBusyWhile } from '@/components/BusyOverlay'
+import { Tooltip } from '@/components/Tooltip'
 
 const CATEGORY_LABELS: Record<string, string> = {
   immediately: 'Immediately (first 48 hours)',
@@ -39,6 +41,7 @@ export function ChecklistClient({ initialItems, isAdmin }: Props) {
   const [adding, setAdding] = useState<AddingItem | null>(null)
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({})
   const [saving, setSaving] = useState(false)
+  useBusyWhile(saving)
   const notesRefs = useRef<Record<string, string>>({})
 
   async function toggleComplete(item: ChecklistItem) {
@@ -160,7 +163,7 @@ export function ChecklistClient({ initialItems, isAdmin }: Props) {
                           placeholder="Description (optional)"
                         />
                         <div className="checklist-item__edit-actions">
-                          <button className="btn-primary btn-sm" onClick={saveEdit} disabled={saving}>Save</button>
+                          <button className="btn-primary btn-sm" onClick={saveEdit} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
                           <button className="btn-secondary btn-sm" onClick={() => setEditing(null)}>Cancel</button>
                         </div>
                       </div>
@@ -196,16 +199,19 @@ export function ChecklistClient({ initialItems, isAdmin }: Props) {
                         </div>
                         {isAdmin && (
                           <div className="checklist-item__actions">
-                            <button
-                              className="btn-icon"
-                              onClick={() => setEditing({ id: item.id, title: item.title, description: item.description ?? '' })}
-                              title="Edit"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                            <button className="btn-icon btn-icon--danger" onClick={() => deleteItem(item.id)} title="Delete">
-                              <Trash2 size={13} />
-                            </button>
+                            <Tooltip text="Edit">
+                              <button
+                                className="btn-icon"
+                                onClick={() => setEditing({ id: item.id, title: item.title, description: item.description ?? '' })}
+                              >
+                                <Pencil size={13} />
+                              </button>
+                            </Tooltip>
+                            <Tooltip text="Delete">
+                              <button className="btn-icon btn-icon--danger" onClick={() => deleteItem(item.id)}>
+                                <Trash2 size={13} />
+                              </button>
+                            </Tooltip>
                           </div>
                         )}
                       </>
@@ -230,7 +236,7 @@ export function ChecklistClient({ initialItems, isAdmin }: Props) {
                       placeholder="Description (optional)"
                     />
                     <div className="checklist-item__edit-actions">
-                      <button className="btn-primary btn-sm" onClick={saveAdd} disabled={saving || !adding.title.trim()}>Add</button>
+                      <button className="btn-primary btn-sm" onClick={saveAdd} disabled={saving || !adding.title.trim()}>{saving ? 'Saving…' : 'Add'}</button>
                       <button className="btn-secondary btn-sm" onClick={() => setAdding(null)}>Cancel</button>
                     </div>
                   </div>

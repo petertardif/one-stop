@@ -63,6 +63,10 @@ p, h1, h2, h3, h4, h5, h6 {
   --surface-sunken: #EDE5D4;
   --surface-border: rgba(46, 41, 33, 0.14);
 
+  /* Table zebra striping — forest-tint wash of the accent (#2F5641) */
+  --table-stripe: rgba(47, 86, 65, 0.045);
+  --table-hover: rgba(47, 86, 65, 0.09);
+
   /* Text — warm near-black */
   --text-primary: #2E2921;
   --text-secondary: #4A4335;
@@ -335,6 +339,12 @@ p, h1, h2, h3, h4, h5, h6 {
   text-decoration: none;
   font-size: inherit;
   min-width: 0;
+  /* Reset for when this element is a <button> (e.g. Financials group) */
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
 }
 
 .sidebar__nav-caret {
@@ -865,6 +875,13 @@ p, h1, h2, h3, h4, h5, h6 {
   border-top: 1px solid var(--border-color);
 }
 
+/* Modal action buttons share the Save (btn-primary) geometry so Cancel mirrors it. */
+.modal__actions button {
+  padding: 9px var(--spacing-md);
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+}
+
 .input-disabled {
   background: var(--surface-secondary);
   color: var(--text-secondary);
@@ -1149,6 +1166,28 @@ p, h1, h2, h3, h4, h5, h6 {
   padding: var(--spacing-xl);
 }
 
+/* Page-level busy overlay shown while any save/delete/reorder is in flight.
+   A <dialog>, so it sits in the top layer above open modals. */
+.busy-overlay {
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: 100vw;
+  max-width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+}
+
+.busy-overlay[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.busy-overlay::backdrop {
+  background: rgba(0, 0, 0, 0.25);
+}
+
 /* === DASHBOARD === */
 
 .dashboard {
@@ -1388,12 +1427,6 @@ p, h1, h2, h3, h4, h5, h6 {
 
 .dashboard__section-header .dashboard__section-title {
   margin-bottom: 0;
-}
-
-.dashboard__action-row {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--spacing-sm);
 }
 
 .account-row__edit {
@@ -1866,6 +1899,11 @@ p, h1, h2, h3, h4, h5, h6 {
   font-weight: 500;
   letter-spacing: -0.02em;
   margin-bottom: var(--spacing-xl);
+}
+
+.coming-soon {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .account-form {
@@ -2346,7 +2384,7 @@ p, h1, h2, h3, h4, h5, h6 {
   align-items: center;
   margin-left: 4px;
   color: var(--text-muted);
-  cursor: help;
+  cursor: default;
   vertical-align: middle;
 }
 
@@ -2579,23 +2617,97 @@ p, h1, h2, h3, h4, h5, h6 {
 .ledger-header { margin-bottom: var(--spacing-lg); }
 .ledger-header h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: var(--spacing-md); }
 
+/* Current-week $1,000 budget card, above the filter/button row */
+.weekly-budget-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+  max-width: 320px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-primary);
+}
+.weekly-budget-card__info { display: flex; flex-direction: column; gap: 2px; }
+.weekly-budget-card__label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.weekly-budget-card__range {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+.weekly-budget-card__amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #16a34a;
+}
+.weekly-budget-card__amount.negative { color: #dc2626; }
+.weekly-budget-card__amount-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
 .ledger-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--spacing-md);
+  /* Stay put under the top bar while the table scrolls. */
+  position: sticky;
+  top: var(--header-height);
+  z-index: 20;
+  background: var(--surface-secondary);
+  padding: var(--spacing-sm) 0;
+}
+.ledger-controls-mobile {
+  position: sticky;
+  top: var(--header-height);
+  z-index: 20;
+  background: var(--surface-secondary);
 }
 
+/* When the controls row sits directly above the table (Investments page),
+   give it breathing room from the header row below it. */
+.ledger-controls + .ledger-table-wrap { margin-top: var(--spacing-lg); }
+
 .period-selector { display: flex; align-items: center; gap: var(--spacing-sm); }
-.period-selector select,
-.category-filter {
-  padding: var(--spacing-xs) var(--spacing-sm);
+
+/* Filter chips — pill-style dropdowns for the ledger Period/Category filters. */
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
   border: 1px solid var(--surface-border);
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   background: var(--surface-primary);
+  transition: border-color 150ms ease;
+}
+.filter-chip:focus-within { border-color: var(--accent); }
+.filter-chip > svg { flex-shrink: 0; color: var(--text-muted); }
+.filter-chip select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  outline: none;
+  background: transparent;
   color: var(--text-primary);
   font-size: var(--font-size-sm);
   cursor: pointer;
+  padding: 0 16px 0 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236E6553' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right center;
 }
 
 .month-nav { display: flex; align-items: center; gap: var(--spacing-xs); font-size: var(--font-size-sm); }
@@ -2609,6 +2721,10 @@ p, h1, h2, h3, h4, h5, h6 {
 }
 
 .account-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* Debts page only: tabs sit on their own row between the title and the charts,
+   rather than inline with the search/action row. */
+.debts-tabs { margin-bottom: var(--spacing-lg); }
 .account-tabs button {
   padding: 4px 10px;
   border: 1px solid var(--surface-border);
@@ -2626,9 +2742,86 @@ p, h1, h2, h3, h4, h5, h6 {
   border-color: var(--accent);
 }
 
-.ledger-actions { display: flex; gap: var(--spacing-sm); margin-left: auto; }
+.ledger-actions { display: flex; gap: var(--spacing-sm); align-items: center; margin-left: auto; }
+/* Ledger toolbar: bulk-action group pinned left, primary group pinned right. */
+.ledger-actions--split { flex: 1 1 auto; margin-left: 0; justify-content: space-between; }
+.ledger-actions__group { display: flex; gap: var(--spacing-sm); align-items: center; }
+
+/* Shared toolbar buttons — "secondary" by default: an accent-colored outline
+   with matching accent text + icon. .primary is the filled main action. */
 .ledger-actions button {
-  padding: var(--spacing-xs) var(--spacing-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px var(--spacing-sm);
+  border: 1px solid var(--accent-hover);
+  border-radius: var(--radius-sm);
+  background: var(--surface-primary);
+  color: var(--accent-hover);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.ledger-actions button svg { width: 14px; height: 14px; flex-shrink: 0; }
+.ledger-actions button:hover:not(:disabled) { background: rgba(67, 113, 89, 0.08); border-color: var(--accent); color: var(--accent); }
+.ledger-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ledger-actions button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.ledger-actions button.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--accent-text); }
+
+/* "Mark as…" toolbar dropdown */
+.mark-menu { position: relative; display: inline-flex; }
+.mark-menu__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 50;
+  min-width: 170px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: var(--surface-primary);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+/* Menu items reset the toolbar-button look — plain rows, not outlined buttons. */
+.mark-menu__list button {
+  width: 100%;
+  justify-content: flex-start;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-weight: 400;
+  padding: 7px var(--spacing-sm);
+}
+.mark-menu__list button:hover:not(:disabled) {
+  background: var(--surface-secondary);
+  border-color: transparent;
+  color: var(--text-primary);
+}
+.mark-menu__divider { height: 1px; background: var(--surface-border); margin: 4px 2px; }
+
+/* Ledger pagination */
+.ledger-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+.ledger-pagination__size { display: flex; align-items: center; gap: var(--spacing-md); }
+.ledger-pagination__size label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-sm); color: var(--text-secondary); }
+.ledger-pagination__size select {
+  padding: 5px 8px;
   border: 1px solid var(--surface-border);
   border-radius: var(--radius-sm);
   background: var(--surface-primary);
@@ -2636,9 +2829,89 @@ p, h1, h2, h3, h4, h5, h6 {
   font-size: var(--font-size-sm);
   cursor: pointer;
 }
-.ledger-actions button:hover { background: var(--surface-secondary); }
+.ledger-pagination__count { font-size: var(--font-size-sm); color: var(--text-muted); }
+.ledger-pagination__pages { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.ledger-pagination__pages button {
+  min-width: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-primary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.ledger-pagination__pages button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.ledger-pagination__pages button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+.ledger-pagination__pages button:disabled { opacity: 0.45; cursor: default; }
+.ledger-pagination__ellipsis { padding: 0 4px; color: var(--text-muted); }
 
-.ledger-table-wrap { overflow-x: auto; }
+/* Budget → "Add to ledger" preview modal */
+.ledger-post { display: flex; flex-direction: column; gap: var(--spacing-md); }
+.ledger-post__list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.ledger-post__list li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: var(--spacing-sm);
+  align-items: baseline;
+  padding: 6px var(--spacing-sm);
+  border-radius: var(--radius-sm);
+}
+.ledger-post__list li:nth-child(odd) { background: var(--surface-secondary); }
+.ledger-post__date { color: var(--text-muted); font-size: var(--font-size-sm); white-space: nowrap; }
+.ledger-post__amt { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ledger-post__total {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--surface-border);
+}
+.ledger-post__note { color: var(--text-muted); font-size: var(--font-size-sm); margin: 0; }
+
+/* Bulk-delete confirmation modal */
+.confirm-dialog {
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  max-width: 420px;
+  color: var(--text-primary);
+  background: var(--surface-primary);
+}
+.confirm-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+.confirm-dialog p { margin: 0 0 var(--spacing-md); }
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+}
+.dialog-actions button {
+  padding: var(--spacing-xs) var(--spacing-md);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.dialog-actions button.danger {
+  border-color: #dc2626;
+  background: #dc2626;
+  color: #fff;
+}
+
+/* The table is its own scroll region so the header can pin. Vertical scroll of
+   the rows keeps `thead` sticky at the top; horizontal scroll moves the header
+   along with the rows (both live in this wrapper). The filter/button row sits
+   outside the wrapper, so it stays put. */
+.ledger-table-wrap { overflow: auto; max-height: calc(100dvh - 220px); }
 
 .ledger-table {
   width: 100%;
@@ -2666,7 +2939,88 @@ p, h1, h2, h3, h4, h5, h6 {
 }
 .ledger-table .col-center { text-align: center; }
 .ledger-table .amount-col { font-variant-numeric: tabular-nums; }
-.ledger-table tr:hover td { background: var(--surface-secondary); }
+
+/* Inline-edit amount cell: stack the credit/debit select above the number input
+   so both fit in the Amount column instead of spilling over Balance. */
+.ledger-table td.amount-edit {
+  width: 130px;
+  min-width: 130px;
+}
+.ledger-table td.amount-edit select,
+.ledger-table td.amount-edit input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+.ledger-table td.amount-edit select {
+  margin-bottom: 4px;
+}
+/* Zebra striping — even body rows, all data tables */
+.ledger-table tbody tr:not(.editing-row):not(.new-row):not(.inv-detail-row):nth-child(even) td,
+.big5-table tbody tr:nth-child(even) td,
+.debt-table tbody tr:nth-child(even) td,
+.invites-table tbody tr:nth-child(even) td,
+.watchlist-table tbody tr:nth-child(even) td,
+.access-table tbody tr:nth-child(even) td { background: var(--table-stripe); }
+
+/* Unified hover — declared after stripe so it wins on even rows */
+.ledger-table tbody tr:not(.editing-row):not(.new-row):not(.inv-detail-row):hover td,
+.big5-table tbody tr:hover td,
+.debt-table tbody tr:hover td,
+.invites-table tbody tr:hover td,
+.watchlist-table tbody tr:hover td,
+.access-table tbody tr:hover td { background: var(--table-hover); }
+
+/* Description & Notes: fixed width, wrap to next line (taller rows) */
+.ledger-table .desc-col {
+  width: 260px;
+  min-width: 260px;
+  max-width: 260px;
+}
+.ledger-table td.desc-col {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* Description centers in a tall row, unless it wraps to 2+ lines itself (JS-toggled). */
+.ledger-table td.desc-col {
+  vertical-align: middle;
+}
+.ledger-table td.desc-col.desc-col--multiline {
+  vertical-align: top;
+}
+/* Notes shown as an icon-only; the note text appears on hover (native title). */
+.notes-icon {
+  display: inline-flex;
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+/* Icon-only action buttons in the ledger (edit / delete / save / cancel) */
+.icon-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: inherit;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.icon-btn:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+.icon-btn--edit {
+  color: #5c7a99;
+}
+.icon-btn--delete,
+.icon-btn--cancel {
+  color: var(--color-negative);
+}
+.icon-btn--save {
+  color: #16a34a;
+}
 
 .ledger-table input[type="text"],
 .ledger-table input[type="number"],
@@ -2683,6 +3037,18 @@ p, h1, h2, h3, h4, h5, h6 {
 
 .ledger-table .editing-row td { background: rgba(var(--accent-rgb, 99,102,241), 0.04); }
 .ledger-table .credit-row .positive { font-weight: 600; }
+
+/* Budget page total row + add-to-ledger status */
+.ledger-table tfoot .budget-total-row td {
+  font-weight: 700;
+  border-top: 2px solid var(--surface-border);
+  background: var(--surface-secondary);
+}
+.budget-status {
+  margin-top: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
 
 /* Debt payoff toggle */
 .payoff-toggle {
@@ -2820,3 +3186,525 @@ p, h1, h2, h3, h4, h5, h6 {
 .settings-status--saved {
   color: var(--color-positive);
 }
+
+/* Toast notifications */
+.toast-viewport {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(380px, calc(100vw - 48px));
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-primary);
+  border: 1px solid var(--surface-border);
+  border-left: 3px solid var(--text-muted);
+  box-shadow: var(--shadow-md);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  pointer-events: auto;
+  animation: toast-in 0.18s ease-out;
+}
+
+.toast--success {
+  border-left-color: var(--color-positive);
+}
+
+.toast--error {
+  border-left-color: var(--color-negative);
+}
+
+.toast--info {
+  border-left-color: var(--accent);
+}
+
+.toast__message {
+  flex: 1;
+}
+
+.toast__close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-subtle);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.toast__close:hover {
+  color: var(--text-primary);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Budget: sortable headers, search + category filter, drag-to-reorder */
+.ledger-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.ledger-table th.sortable:hover {
+  color: var(--text-primary);
+}
+.th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ledger-table th.amount-col .th-sort,
+.ledger-table th.col-center .th-sort {
+  justify-content: center;
+}
+
+.ledger-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  background: var(--surface-primary);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+.ledger-search input {
+  border: none;
+  background: none;
+  padding: 8px 0;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  outline: none;
+  min-width: 160px;
+}
+
+.ledger-filter {
+  padding: 8px 10px;
+  background: var(--surface-primary);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.ledger-table tbody tr.draggable-row {
+  cursor: grab;
+}
+.ledger-table tbody tr.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+/* Multiselect filter dropdown (Auto page car/year filters) */
+.multiselect {
+  position: relative;
+  display: inline-block;
+}
+.multiselect-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 150px;
+  max-width: 240px;
+  padding: 8px 10px;
+  background: var(--surface-primary);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.multiselect-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.multiselect-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  max-width: min(320px, 90vw);
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--surface-primary);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+.multiselect-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.multiselect-option:hover,
+.multiselect-option.selected {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.05));
+}
+.multiselect-check {
+  display: inline-flex;
+  width: 14px;
+  color: var(--accent, #2563eb);
+}
+.multiselect-empty {
+  padding: 8px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Investments page — charts */
+.inv-charts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg, 16px);
+  margin-bottom: var(--spacing-lg, 16px);
+}
+/* Recharts hover tooltips: rounder corners, always painted above everything. */
+.inv-charts .recharts-tooltip-wrapper {
+  z-index: 9999 !important;
+}
+.inv-charts .recharts-default-tooltip {
+  border-radius: var(--radius-md, 8px) !important;
+  overflow: hidden;
+}
+.inv-charts-top {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: var(--spacing-lg, 16px);
+}
+@media (max-width: 900px) {
+  .inv-charts-top { grid-template-columns: 1fr; }
+}
+.inv-chart-card {
+  background: var(--surface-primary);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-lg, 12px);
+  padding: var(--spacing-md, 12px) var(--spacing-lg, 16px);
+}
+.inv-chart-card h2 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.inv-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.inv-chart-head h2 { margin-bottom: 0; }
+.inv-dim-toggle { display: inline-flex; gap: 2px; }
+.inv-dim-toggle button {
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.inv-dim-toggle button:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.inv-dim-toggle button:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; border-left: none; }
+.inv-dim-toggle button.active {
+  background: var(--accent, #2563eb);
+  border-color: var(--accent, #2563eb);
+  color: #fff;
+}
+
+/* Investments — contribution editor + drill-down */
+.inv-contrib-edit { display: flex; flex-direction: column; gap: 4px; }
+.inv-expand { color: var(--text-secondary); }
+.inv-detail-row > td { background: var(--surface-secondary, rgba(0, 0, 0, 0.02)); }
+.inv-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xl, 24px);
+  padding: var(--spacing-md, 12px) var(--spacing-sm, 8px);
+}
+.inv-detail h3 {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.inv-detail-history { min-width: 280px; }
+.inv-detail-strategy { max-width: 460px; }
+.inv-detail-strategy p { white-space: pre-line; color: var(--text-secondary); font-size: 0.9rem; }
+.inv-detail-empty { color: var(--text-muted); font-size: 0.9rem; }
+/* Balance-history table mirrors the site's .ledger-table look (no filtering/search). */
+.inv-history-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.inv-history-table th {
+  text-align: left;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: var(--surface-primary);
+  border-bottom: 1px solid var(--surface-border);
+}
+.inv-history-table td {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--surface-primary);
+  border-bottom: 1px solid var(--surface-border);
+  vertical-align: middle;
+}
+.inv-history-table .col-center { text-align: center; }
+.inv-history-table .amount-col { font-variant-numeric: tabular-nums; }
+.inv-history-table tbody tr:nth-child(even) td { background: var(--table-stripe); }
+.inv-history-table tbody tr:hover td { background: var(--table-hover); }
+
+/* Investments — add-snapshot-date modal */
+.inv-snap-date { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-secondary); }
+.inv-snap-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+@media (max-width: 560px) { .inv-snap-grid { grid-template-columns: 1fr; } }
+.inv-snap-item { display: flex; flex-direction: column; gap: 3px; font-size: 0.82rem; color: var(--text-secondary); }
+
+/* Shared "add a record" modal (Budget, Debts, Subscriptions, Auto, Donations). */
+.record-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.record-field { display: flex; flex-direction: column; gap: 3px; font-size: 0.82rem; color: var(--text-secondary); }
+.record-field--full { grid-column: 1 / -1; }
+
+/* Text inputs, selects and textareas share one on-brand box style (design
+   tokens from .form-field), so a <select> reads the same as a text input. */
+.record-field input:not([type="checkbox"]),
+.record-field select,
+.record-field textarea {
+  width: 100%;
+  padding: 9px var(--spacing-sm);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-primary);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  transition: border-color 150ms ease;
+  outline: none;
+}
+.record-field input:not([type="checkbox"]):focus,
+.record-field select:focus,
+.record-field textarea:focus {
+  border-color: var(--accent);
+}
+/* Selects drop the native OS chrome and use a custom caret to match inputs. */
+.record-field select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236E6553' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+.record-field input[type="checkbox"] { width: auto; align-self: start; }
+
+@media (max-width: 560px) {
+  .record-form-grid { grid-template-columns: 1fr; }
+}
+
+/* === TOOLTIP (replaces native `title`; see components/Tooltip.tsx) === */
+.app-tooltip {
+  position: fixed;
+  z-index: 3000;
+  max-width: 280px;
+  padding: 6px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--text-primary);
+  color: #fff;
+  font-size: var(--font-size-xs);
+  line-height: 1.35;
+  font-weight: 500;
+  text-align: left;
+  white-space: normal;
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+  animation: app-tooltip-in 120ms ease-out;
+}
+
+.app-tooltip__caret {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--text-primary);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.app-tooltip--top .app-tooltip__caret { bottom: -4px; }
+.app-tooltip--bottom .app-tooltip__caret { top: -4px; }
+
+@keyframes app-tooltip-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* === MOBILE SHELL (hamburger drawer) ===================================
+   The sidebar is a fixed 240px column on desktop. At <=768px it becomes an
+   off-canvas drawer toggled by the Topbar hamburger; see MobileNavContext. */
+
+/* Hamburger lives in the Topbar's left slot; desktop hides it. */
+.topbar__hamburger {
+  display: none;
+  padding: 6px;
+  margin-left: -6px;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.topbar__hamburger:hover { background: var(--surface-secondary); }
+
+/* Drawer backdrop; only meaningful while the drawer is open on mobile. */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 150;
+}
+
+@media (max-width: 768px) {
+  .topbar__hamburger { display: inline-flex; }
+  .sidebar-backdrop { display: block; }
+
+  /* Off-canvas drawer: full width regardless of the desktop rail state. */
+  .sidebar,
+  .sidebar--collapsed {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    height: 100vh;
+    width: var(--sidebar-width-expanded);
+    transform: translateX(-100%);
+    transition: transform var(--sidebar-transition);
+    z-index: 200;
+  }
+  .sidebar--mobile-open { transform: translateX(0); }
+
+  /* The desktop rail-collapse toggle is meaningless inside the drawer. */
+  .sidebar__collapse-item { display: none; }
+
+  /* Sidebar is now out of flow, so main content reclaims the full width. */
+  .app-shell__content { padding: var(--spacing-md); }
+
+  /* Action button cluster wraps instead of overflowing its row. */
+  .ledger-actions { margin-left: 0; width: 100%; flex-wrap: wrap; }
+}
+
+/* Phone-width content collapses (separate from the 768px shell breakpoint). */
+@media (max-width: 640px) {
+  .stat-cards,
+  .stat-cards--small { grid-template-columns: 1fr; }
+
+  .form-row { flex-wrap: wrap; }
+  .form-field--narrow { flex-basis: auto !important; }
+}
+
+/* === LEDGER MOBILE FILTERS ============================================
+   Desktop shows the full inline controls row; mobile collapses them into a
+   single Filters button that opens the .ledger-filters-modal. */
+.ledger-controls-mobile { display: none; }
+
+.ledger-filters-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-primary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.ledger-filters-btn:hover { background: var(--surface-secondary); }
+
+.ledger-filters-modal__body { display: flex; flex-direction: column; gap: var(--spacing-md); }
+.ledger-filters-modal__field { display: flex; flex-direction: column; gap: 6px; }
+.ledger-filters-modal__label { font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); }
+.ledger-filters-modal__field .period-selector,
+.ledger-filters-modal__field .account-tabs { flex-wrap: wrap; }
+.ledger-filters-modal__field select { width: 100%; }
+
+@media (max-width: 768px) {
+  .ledger-controls--desktop { display: none; }
+  .ledger-controls-mobile { display: flex; }
+}
+
+/* Weekly budget cards row (remaining + 1k spent-total), side by side / wrap. */
+.weekly-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+.weekly-cards .weekly-budget-card { margin-bottom: 0; }
+
+/* Total card shows spend (neutral, not the green "remaining" color). */
+.weekly-budget-card--total .weekly-budget-card__amount { color: var(--text-primary); }
+
+/* Small, unobtrusive week picker inside the total card. */
+.weekly-budget-card__week {
+  margin-top: 2px;
+  max-width: 175px;
+  padding: 1px 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+.weekly-budget-card__week:hover { color: var(--text-primary); }
+.weekly-budget-card__week:focus-visible { outline: 1px solid var(--surface-border); border-radius: 4px; }
+
+/* Budget-account icons in the ledger's Budget column. */
+.budget-icon--bank { color: var(--text-secondary); }
+.budget-icon--chase { color: #117ACA; }  /* Chase flagship blue */
+.budget-icon--boa { color: #E31837; }    /* Bank of America flagship red */
+
+/* Ledger Notes column: the paired check/notes icons in the read view. */
+.ledger-cell-icons { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }

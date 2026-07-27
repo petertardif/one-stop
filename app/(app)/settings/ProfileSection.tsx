@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { useRouter } from 'next/navigation'
 import { X, ChevronDown, Pencil } from 'lucide-react'
 import { ErrorMessage } from '@/components/ErrorMessage'
+import { useBusyWhile } from '@/components/BusyOverlay'
 
 function isRealPastDate(val: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) return false
@@ -137,6 +138,8 @@ export function ProfileSection({ profile, email }: Props) {
   }
 
   function closeModal() { setOpen(false) }
+
+  useBusyWhile(isSubmitting)
 
   async function onSubmit(values: FormValues) {
     setServerError(null)

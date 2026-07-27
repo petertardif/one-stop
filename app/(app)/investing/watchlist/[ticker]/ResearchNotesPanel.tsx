@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { Trash2, X } from 'lucide-react'
 import { ErrorMessage } from '@/components/ErrorMessage'
+import { useBusyWhile } from '@/components/BusyOverlay'
 
 interface Note {
   id: string
@@ -20,6 +21,7 @@ export function ResearchNotesPanel({ ticker, initialNotes, isAdmin }: Props) {
   const [notes, setNotes] = useState<Note[]>(initialNotes)
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
+  useBusyWhile(saving)
   const [error, setError] = useState<string | null>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
 

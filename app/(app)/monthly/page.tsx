@@ -22,7 +22,11 @@ async function getLedgerAccounts(userId: string): Promise<AccountRow[]> {
   return result.rows
 }
 
-export default async function MonthlyPage() {
+export default async function MonthlyPage({
+  searchParams,
+}: {
+  searchParams: { period?: string }
+}) {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
 
@@ -30,7 +34,7 @@ export default async function MonthlyPage() {
 
   return (
     <main>
-      <MonthlyLedger accounts={accounts} />
+      <MonthlyLedger accounts={accounts} initialPeriod={searchParams.period} />
     </main>
   )
 }

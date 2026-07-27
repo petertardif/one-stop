@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2, RotateCcw } from 'lucide-react'
+import { Tooltip } from '@/components/Tooltip'
 
 export interface TooHardRow {
   id: string
@@ -56,35 +57,37 @@ export function TooHardClient({ initialRows }: { initialRows: TooHardRow[] }) {
             <td className="text-muted" style={{ fontSize: '0.875rem' }}>
               {new Date(row.dismissed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </td>
-            <td
-              className="text-muted"
-              style={{ fontSize: '0.875rem' }}
-              title={row.reason ?? undefined}
-            >
-              {row.reason
-                ? row.reason.length > 35
-                  ? row.reason.slice(0, 35) + '…'
-                  : row.reason
-                : '—'}
+            <td className="text-muted" style={{ fontSize: '0.875rem' }}>
+              <Tooltip text={row.reason ?? undefined}>
+                <span>
+                  {row.reason
+                    ? row.reason.length > 35
+                      ? row.reason.slice(0, 35) + '…'
+                      : row.reason
+                    : '—'}
+                </span>
+              </Tooltip>
             </td>
             <td>
               <div style={{ display: 'flex', gap: 'var(--spacing-xs)', justifyContent: 'flex-end' }}>
-                <button
-                  className="btn-sm btn-secondary"
-                  onClick={() => handleReanalyze(row.id, row.ticker)}
-                  disabled={reanalyzing === row.id || deleting === row.id}
-                  title="Re-analyze this stock"
-                >
-                  <RotateCcw size={13} /> Reanalyze
-                </button>
-                <button
-                  className="btn-icon btn-icon--danger"
-                  onClick={() => handleDelete(row.id, row.ticker)}
-                  disabled={deleting === row.id || reanalyzing === row.id}
-                  title="Remove permanently"
-                >
-                  <Trash2 size={13} />
-                </button>
+                <Tooltip text="Re-analyze this stock">
+                  <button
+                    className="btn-sm btn-secondary"
+                    onClick={() => handleReanalyze(row.id, row.ticker)}
+                    disabled={reanalyzing === row.id || deleting === row.id}
+                  >
+                    <RotateCcw size={13} /> Reanalyze
+                  </button>
+                </Tooltip>
+                <Tooltip text="Remove permanently">
+                  <button
+                    className="btn-icon btn-icon--danger"
+                    onClick={() => handleDelete(row.id, row.ticker)}
+                    disabled={deleting === row.id || reanalyzing === row.id}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </Tooltip>
               </div>
             </td>
           </tr>
