@@ -1221,28 +1221,51 @@ p, h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
 }
 
-.dashboard__row {
+/* Module summary tiles (each links to its section) */
+.dashboard__tiles {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--spacing-lg);
-  align-items: start;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--spacing-md);
 }
 
-@media (max-width: 900px) {
-  .dashboard__row {
-    grid-template-columns: 1fr;
-  }
-}
-
-.dashboard__col {
+.dashboard-tile {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: 4px;
+  padding: var(--spacing-md);
+  background: var(--surface-secondary);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: border-color 150ms ease, background 150ms ease;
 }
 
-.dashboard__section--accounts {
-  grid-row: span 1;
+.dashboard-tile:hover {
+  border-color: var(--accent);
+  background: var(--surface-primary);
 }
+
+.dashboard-tile__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.dashboard-tile__label svg { color: var(--accent); }
+
+.dashboard-tile__value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.dashboard-tile__value small { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
+.dashboard-tile__value.positive { color: var(--color-positive); }
+.dashboard-tile__value.negative { color: var(--color-negative); }
+.dashboard-tile__sub { font-size: 0.75rem; color: var(--text-muted); }
 
 .dashboard__empty {
   font-size: var(--font-size-sm);
@@ -1322,147 +1345,14 @@ p, h1, h2, h3, h4, h5, h6 {
 .stat-card--positive { color: var(--color-positive); }
 .stat-card--negative { color: var(--color-negative); }
 
-/* Accounts panel */
-
-.accounts-group {
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  margin-bottom: var(--spacing-sm);
-}
-
-.accounts-group__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--spacing-sm) var(--spacing-md);
-  background: var(--surface-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.account-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-top: 1px solid var(--surface-border);
-  gap: var(--spacing-md);
-}
-
-.account-row__info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.account-row__name {
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.account-row__institution {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.account-row__right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.account-row__balance {
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-}
-
-.account-row__synced {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-}
-
 /* Chart */
 
 .chart-wrap {
   margin-top: var(--spacing-sm);
 }
 
-/* Debt table */
-
-.debt-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--font-size-sm);
-  margin-top: var(--spacing-md);
-}
-
-.debt-table th,
-.debt-table td {
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-bottom: 1px solid var(--surface-border);
-  text-align: left;
-}
-
-.debt-table th {
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
 .positive { color: var(--color-positive); }
 .negative { color: var(--color-negative); }
-
-/* === DASHBOARD ACTION HOOKS === */
-
-.dashboard__section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--spacing-md);
-}
-
-.dashboard__section-header .dashboard__section-title {
-  margin-bottom: 0;
-}
-
-.account-row__edit {
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  padding: 2px 4px;
-  border-radius: var(--radius-sm);
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.account-row:hover .account-row__edit {
-  opacity: 1;
-}
-
-.account-row__edit:hover {
-  color: var(--accent);
-}
-
-.account-row__balance-edit {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.account-row__balance-input {
-  width: 90px;
-  padding: 3px 6px;
-  font-size: 13px;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  text-align: right;
-  background: var(--surface-primary);
-  color: var(--text-primary);
-}
 
 .btn-sm {
   display: inline-flex;
@@ -2808,6 +2698,8 @@ p, h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
 }
 .mark-menu__divider { height: 1px; background: var(--surface-border); margin: 4px 2px; }
+/* Align a menu to the right edge of its trigger (for the rightmost toolbar button). */
+.mark-menu__list--right { left: auto; right: 0; }
 
 /* Ledger pagination */
 .ledger-pagination {
@@ -2906,6 +2798,84 @@ p, h1, h2, h3, h4, h5, h6 {
   background: #dc2626;
   color: #fff;
 }
+.dialog-actions button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.dialog-actions button.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* === IN CASE I DIE — GOODBYES === */
+.goodbyes { max-width: 760px; }
+.goodbyes h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: var(--spacing-md); }
+.goodbyes-lead { color: var(--text-secondary); line-height: 1.6; margin-bottom: var(--spacing-lg); }
+
+.goodbyes-author-bar { display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-lg); }
+.goodbyes-author-bar--top { margin-top: 0; margin-bottom: var(--spacing-lg); justify-content: flex-end; }
+.goodbyes-manage-link { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.goodbyes-reset { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #dc2626; background: none; color: #dc2626; border-radius: var(--radius-sm); padding: 7px var(--spacing-sm); cursor: pointer; }
+.goodbyes-reset:hover { background: rgba(220, 38, 38, 0.08); }
+
+/* Death gate — in the author view it sits below the message table with a gap. */
+.goodbyes-gate-section { margin-top: var(--spacing-2xl); }
+.goodbyes-gate {
+  text-align: center;
+  padding: var(--spacing-2xl) var(--spacing-lg);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-primary);
+}
+.goodbyes-gate__lead { color: var(--text-secondary); max-width: 480px; margin: 0 auto var(--spacing-lg); line-height: 1.6; }
+.goodbyes-gate__question { font-size: 1.5rem; font-weight: 700; margin-bottom: var(--spacing-xl); }
+.goodbyes-gate__buttons { display: flex; gap: var(--spacing-lg); justify-content: center; }
+.goodbyes-gate__btn {
+  min-width: 140px;
+  padding: var(--spacing-md) var(--spacing-xl);
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  border: 1px solid var(--surface-border);
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.goodbyes-gate__btn--yes { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.goodbyes-gate__btn--yes:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.goodbyes-gate__btn--no { background: var(--surface-primary); color: var(--text-primary); }
+.goodbyes-gate__btn--no:hover { border-color: var(--text-muted); }
+.goodbyes-gate__comfort { margin: var(--spacing-xl) auto 0; max-width: 520px; color: var(--text-secondary); line-height: 1.7; font-style: italic; }
+
+/* Type-to-confirm dialog */
+.goodbyes-confirm { max-width: 480px; }
+.goodbyes-confirm__label { display: block; font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--spacing-xs); }
+.goodbyes-confirm__input {
+  width: 100%;
+  padding: 9px var(--spacing-sm);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-primary);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  margin-bottom: var(--spacing-md);
+}
+.goodbyes-confirm__input:focus { outline: none; border-color: var(--accent); }
+
+/* Delivery stub */
+.goodbyes-delivery { padding: var(--spacing-xl); border: 1px solid var(--surface-border); border-radius: var(--radius-lg); background: var(--surface-primary); }
+.goodbyes-delivery__lead { font-size: 1.1rem; font-weight: 600; margin-bottom: var(--spacing-sm); }
+.goodbyes-delivery__note { color: var(--text-muted); line-height: 1.6; }
+
+/* Manage */
+.goodbyes-manage__header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--spacing-md); margin-bottom: var(--spacing-md); flex-wrap: wrap; }
+.goodbyes-manage__header .ledger-actions { margin-left: 0; }
+.goodbyes-back { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-size-sm); color: var(--text-muted); text-decoration: none; margin-bottom: var(--spacing-xs); }
+.goodbyes-back:hover { color: var(--accent); }
+.goodbyes-image-row { display: grid; grid-template-columns: 2fr 2fr auto; gap: var(--spacing-xs); margin-bottom: var(--spacing-xs); }
+.goodbyes-add-image { display: inline-flex; align-items: center; gap: 4px; align-self: start; margin-top: 4px; background: none; border: 1px dashed var(--surface-border); border-radius: var(--radius-sm); padding: 6px var(--spacing-sm); color: var(--accent-hover); cursor: pointer; font-size: var(--font-size-sm); }
+.goodbyes-offset { display: flex; gap: var(--spacing-xs); }
+.goodbyes-offset input { width: 80px; }
 
 /* The table is its own scroll region so the header can pin. Vertical scroll of
    the rows keeps `thead` sticky at the top; horizontal scroll moves the header
@@ -2958,7 +2928,6 @@ p, h1, h2, h3, h4, h5, h6 {
 /* Zebra striping — even body rows, all data tables */
 .ledger-table tbody tr:not(.editing-row):not(.new-row):not(.inv-detail-row):nth-child(even) td,
 .big5-table tbody tr:nth-child(even) td,
-.debt-table tbody tr:nth-child(even) td,
 .invites-table tbody tr:nth-child(even) td,
 .watchlist-table tbody tr:nth-child(even) td,
 .access-table tbody tr:nth-child(even) td { background: var(--table-stripe); }
@@ -2966,7 +2935,6 @@ p, h1, h2, h3, h4, h5, h6 {
 /* Unified hover — declared after stripe so it wins on even rows */
 .ledger-table tbody tr:not(.editing-row):not(.new-row):not(.inv-detail-row):hover td,
 .big5-table tbody tr:hover td,
-.debt-table tbody tr:hover td,
 .invites-table tbody tr:hover td,
 .watchlist-table tbody tr:hover td,
 .access-table tbody tr:hover td { background: var(--table-hover); }
@@ -3050,45 +3018,7 @@ p, h1, h2, h3, h4, h5, h6 {
   color: var(--text-secondary);
 }
 
-/* Debt payoff toggle */
-.payoff-toggle {
-  display: flex;
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-.payoff-toggle__btn {
-  padding: 3px 10px;
-  font-size: 0.72rem;
-  font-weight: 500;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-muted);
-  transition: background 150ms, color 150ms;
-}
-
-.payoff-toggle__btn--active {
-  background: var(--accent);
-  color: #fff;
-}
-
-.debt-priority {
-  font-weight: 700;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  width: 24px;
-}
-
 .col-right { text-align: right; }
-
-.debt-method-hint {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-top: var(--spacing-sm);
-  line-height: 1.5;
-}
 
 /* === ACCESS SETTINGS === */
 

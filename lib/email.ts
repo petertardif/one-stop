@@ -45,6 +45,22 @@ export async function sendInviteEmail(to: string, token: string): Promise<void> 
   }
 }
 
+// Notify the admin the moment a recipient confirms the death gate (irreversible,
+// triggers Goodbyes delivery). `confirmerName` is a best-effort display label.
+export async function sendDeathTriggerEmail(to: string, confirmerName: string): Promise<void> {
+  const url = `${BASE_URL}/contingency/messages`
+  const info = await mailer.sendMail({
+    from: FROM,
+    to,
+    subject: 'One Stop — your Goodbyes have been triggered',
+    text: `${confirmerName} just confirmed the "has passed away" gate in One Stop, so your Goodbyes messages are now being delivered.\n\nIf this was a mistake, sign in and reset the death status here:\n\n${url}`,
+  })
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('Death-trigger email preview:', nodemailer.getTestMessageUrl(info))
+  }
+}
+
 export async function sendPasswordResetEmail(to: string, token: string): Promise<void> {
   const url = `${BASE_URL}/reset-password?token=${token}`
   const info = await mailer.sendMail({

@@ -11,8 +11,8 @@
 | Role | Access |
 |------|--------|
 | **Admin** (primary user) | Full read/write across all sections |
-| **Partner** | Read-only on Dashboard & "In Case I Die"; access to investing research by default (configurable); some write access for specific sections (configurable) |
-| **Dependent** | Read-only on Dashboard & "In Case I Die"; access to investing research by default (configurable); some write access for specific sections (configurable) |
+| **Partner** | Read-only on Dashboard & "Contingency Plan"; access to investing research by default (configurable); some write access for specific sections (configurable) |
+| **Dependent** | Read-only on Dashboard & "Contingency Plan"; access to investing research by default (configurable); some write access for specific sections (configurable) |
 
 Authentication: email + password, JWT sessions via NextAuth.js. Role is stored on the user record in the database.
 
@@ -36,44 +36,26 @@ The authenticated shell ([app/(app)/layout.tsx](app/(app)/layout.tsx)) is a fixe
 
 ### 2. Financial Dashboard (`/app/dashboard`)
 
-The primary landing page after login. Provides an at-a-glance view of the family's complete financial picture.
+The primary landing page after login. An at-a-glance view **derived entirely from the feature modules** (Investments, Debts, Ledger, Budget, Subscriptions, Auto) — **not** the legacy `accounts` table. All figures come from a single `GET /api/dashboard?tz=IANA` call.
 
 **Sections:**
 
 #### Net Worth Summary
-- Total assets vs. total liabilities → net worth
-- Trend chart (monthly net worth over rolling 12 months)
+- **Assets = Σ latest value of active investments** (`investments` where `liquidated_at IS NULL`); **Liabilities = Σ latest balance of active debts** (`debt_accounts` where `paid_at IS NULL`); **Net Worth = Assets − Liabilities**.
+- **Net-worth-over-time** line chart: the union of all investment + debt snapshot dates (last 12 months), each date's assets/liabilities computed by **carry-forward** (each account's latest snapshot on/before that date, via the shared `valueOnOrBefore` in `lib/snapshots.ts`), ending at today. Active accounts only (a liquidated/paid account drops out of the trend — a deliberate simplification).
 
-#### Accounts Panel
-- List of all financial accounts grouped by type:
-  - Checking / Savings
-  - Investment / Brokerage
-  - Retirement (401k, IRA, Roth IRA)
-  - Real Estate
-  - Debt (mortgage, car loans, credit cards, student loans)
-- Each account shows: institution name, account nickname, current balance, last updated timestamp
-- Manual balance update button on each account
-- Optional: "Sync" button for Plaid-connected accounts
+#### At-a-Glance tiles
+Compact tiles, each a link to its module: **This Week's 1k** (weekly remaining + spent → `/monthly`, via the shared `getWeeklyBudget` in `lib/weeklyBudget.ts`) · **Monthly Bills** (Budget Next-Monthly total + trailing-12-mo `monthly_average` → `/budget`) · **Subscriptions** (active /yr · /mo → `/subscriptions`) · **Auto Service** (cost YTD → `/auto`). (Portfolio/Total Debt are intentionally omitted — they'd duplicate the Net Worth assets/liabilities above.)
 
 #### Monthly Cash Flow
-- Income vs. expenses for current month
-- Manual entry of income/expense categories
-- Simple bar chart (income bar vs. expense bar)
+- Income vs. expenses for the current month (from `transactions`), with a simple bar chart. (Transactions are entered in the Ledger.)
 
-#### Debt Snapshot
-- Total debt balance
-- List of debts with balance, interest rate, minimum payment
-- Payoff order suggestion (avalanche or snowball)
+**Removed (pending Plaid):** the manual **Accounts Panel**, the **Debt Snapshot** table (superseded by the Debts module), the `accounts`-based net-worth math, and the per-load `net_worth_snapshots` write. The `accounts` table, `/dashboard/accounts/*` pages, `AccountForm`, `/api/accounts*`, and all Plaid code remain in the codebase (untouched) for the future Plaid + account-setup flow, but are no longer surfaced on the dashboard.
 
-**Data Entry:**
-- `/dashboard/accounts/new` — add a new account (manual or Plaid-linked)
-- `/dashboard/accounts/[id]/edit` — edit account details or update balance
-- Transactions are logged/edited from the **Ledger** (`/monthly`) via its Add/Edit modal — there is no separate dashboard transaction page.
+`GET /api/dashboard?tz=IANA` returns `{ netWorth {assets,liabilities,netWorth}, netWorthHistory [{date,assets,liabilities,netWorth}], cashFlow {income,expenses}, weekly {week_start,remaining,spent}, monthlyBills {nextMonthly,monthlyAverage}, subscriptions {perYear,perMonth}, auto {ytd} }`.
 
-**Plaid Integration (optional per account):**
-- "Connect to bank" flow using Plaid Link widget
-- Plaid access tokens stored server-side (never exposed to client)
-- Background sync job or manual "sync now" button refreshes balances
+**Plaid Integration (future, not yet surfaced):**
+- "Connect to bank" flow using Plaid Link widget; access tokens stored server-side (never exposed to client); manual "sync now" refreshes balances. Re-surface the Accounts Panel + Sync once this exists.
 
 ---
 
@@ -111,9 +93,9 @@ A full transaction ledger showing credits and debits from the family's checking 
 
 **Add / Edit:** both use a **modal** (shared `RecordModal`), not inline rows — the row set grew too complex to edit in place. The row's edit (✎) button opens the modal pre-filled; `Add` opens it empty (new transactions are always manual — no account/source picker). Field order: Date · Posted (**defaults unchecked**) · Category · Budget account (**defaults to Chase CC**) · Description · Type (+ Credit / − Debit) · Amount (positive; Type sets the sign) · Check # · Notes. The **Amount** input is a **cash-register money field** — digits fill from the right as cents and the decimal is inserted automatically (`1234` → `12.34`). **Check # only shows when Budget account = Bank.** **Save is disabled until a non-zero Amount, a Category, and a Description are entered.** Closes on Save/Cancel/×/backdrop/Escape.
 
-**Toolbar actions:** `Mark as…`, `Duplicate`, `Delete`, `Add to 1k Weekly`, `Add` (right group). Buttons use the shared toolbar styling: `Add` is the filled primary; every other button (including `Delete`) is an accent-outline secondary. Every button carries an icon + label. **`Sync` is hidden** (gated behind `SHOW_SYNC` in `MonthlyLedger.tsx`) until Plaid + an account-setup flow exist; it will return to the left of the toolbar then.
+**Toolbar actions:** `Mark as…`, `Duplicate`, `Delete`, `Add` (right group). **`Add`** is a filled-primary **dropdown** (chevron; same open/outside-click/Escape behavior as `Mark as…`) with two icon options — **New Transaction** (opens the add-transaction modal) and **Amount to 1k Weekly** (opens the weekly top-up modal). Every other button (including `Delete`) is an accent-outline secondary; every button carries an icon + label. **`Sync` is hidden** (gated behind `SHOW_SYNC` in `MonthlyLedger.tsx`) until Plaid + an account-setup flow exist; it will return to the left of the toolbar then.
 
-**Mobile controls:** below 768px the inline controls row collapses to a single **Filters** button that opens a modal containing the two filters (Period · Category) and the action buttons (Add to 1k Weekly · Add · Duplicate · Delete). **Sync Accounts is hidden on mobile.** Desktop is unchanged.
+**Mobile controls:** below 768px the inline controls row collapses to a single **Filters** button that opens a modal containing the two filters (Period · Category) and the action buttons (Mark as… · Duplicate · Delete · Add — where **Add** is the same two-option dropdown). **Sync Accounts is hidden on mobile.** Desktop is unchanged.
 
 **Pagination:** the ledger is **server-paginated**, newest-first. A footer below the table has a **Rows-per-page** dropdown (`100` default · `300` · `500` · `1000`), a `start–end of total` count, and page controls: **« First · ‹ Prev · windowed page numbers (with … ellipsis) · Next › · Last »**. Changing a filter or the page size resets to **page 1**; the page auto-clamps if the total shrinks (e.g. after a bulk delete). The running balance / 1K weekly balance are unaffected (computed server-side over the full ledger).
 
@@ -122,7 +104,7 @@ A full transaction ledger showing credits and debits from the family's checking 
 - **Duplicate** — copies each selected row as a new **manual** transaction: all fields copied as-is, keeps the original date, description prefixed with `Copy of: `, appended to the ledger tail with a fresh `seq`/`balance`.
 - **Mark as…** — a dropdown menu (closes on pick / outside-click / Escape) that mass-updates **one field at a time** across the selected **manual** rows: **Posted** / **Unposted** (`is_posted`), then **Budget-N/A** / **Budget-Bank** / **Budget-Chase CC** / **Budget-BoA CC** (`budget_account`, with `budget_flagged` kept in sync). Neither field touches the running `balance`, so no re-shift.
 
-**Weekly budget top-up:** an **Add to a week** button on the $1,000 card opens a modal (amount + week dropdown — last 2 weeks, current, next 3). Each submission **raises** the chosen Fri→Thu week's allowance by the amount (e.g. $1,000 → $1,200). Stored in `weekly_budget_adjustments` (keyed by the Friday `week_start`); affects **only** the 1K weekly balance — it never creates a ledger row and never touches the checkbook `balance` column. The ledger window function and the current-week card both add the week's summed top-ups.
+**Weekly budget top-up:** the **Amount to 1k Weekly** option in the toolbar's `Add` dropdown opens a modal (amount + week dropdown — last 2 weeks, current, next 3). Each submission **raises** the chosen Fri→Thu week's allowance by the amount (e.g. $1,000 → $1,200). Stored in `weekly_budget_adjustments` (keyed by the Friday `week_start`); affects **only** the 1K weekly balance — it never creates a ledger row and never touches the checkbook `balance` column. The ledger window function and the current-week card both add the week's summed top-ups.
 
 **Plaid sync:** the "Sync" button (which calls `/api/plaid/sync`) is **hidden until Plaid is implemented with an account-setup flow** — there are no connected accounts yet, so syncing has nothing to do. Re-enable via `SHOW_SYNC = true` in `MonthlyLedger.tsx` once account connection exists. When live: Plaid transactions cannot be deleted (only edited); manual transactions can be deleted.
 
@@ -163,13 +145,13 @@ A table of recurring budget line items (bills), under the Financials sidebar gro
 - **Search** — text box next to the Archived tab; filters by description or category.
 - **Category filter** — dropdown next to search; filters to a single category. Totals reflect the visible (filtered) rows.
 
-**Add to Ledger:** select items → posts each as a `transactions` row in **next month** on the item's **Due Date day** (clamped to the month's last day, e.g. 31 → Feb 28/29; no Due Date → 1st), category `MONTHLY BILLS`, amount = Next Monthly (expense), tagged with `budget_item_id`. **Deduped** by `(budget_item_id, month)` so a bill can't post twice per month; maintains ledger `seq`/`balance`.
+**Add to Ledger:** select items → **Add to Ledger** opens a **preview modal**: a target **month** picker (last month → +5 months, default **next month**), the list of selected bills each with its computed post date + amount, and a total; **Add N to ledger** confirms. Posts each as a `transactions` row in the chosen month on the item's **Due Date day** (clamped to the month's last day, e.g. 31 → Feb 28/29; no Due Date → 1st), category `MONTHLY BILLS`, amount = Next Monthly (expense), **`is_posted` = false** (posts unchecked), tagged with `budget_item_id`. **Deduped** by `(budget_item_id, month)` so a bill can't post twice per month (skips reported back); maintains ledger `seq`/`balance`. On success the app **redirects to the ledger opened on that month** (`/monthly?period=YYYY-MM`).
 
 **API routes:**
 - `GET /api/budget-items?archived=` — items + `monthly_average`
 - `POST /api/budget-items` — create (admin)
 - `PUT /api/budget-items/[id]` — edit fields / archive / restore (admin)
-- `POST /api/budget-items/add-to-ledger` — post selected items to the ledger (admin)
+- `POST /api/budget-items/add-to-ledger` — `{ ids, month? }` (`month` = `YYYY-MM`, defaults to next month); post selected items to the ledger for that month, `is_posted` false, deduped by `(budget_item_id, month)` (admin)
 - `POST /api/budget-items/reorder` — `{ ids }` in new display order; rewrites `sort_order` (admin)
 
 ### 3.2 Debts (`/app/debts`)
@@ -409,7 +391,7 @@ A log of stocks the user has researched and consciously passed on, so they are n
 
 ---
 
-### 5. In Case I Die (`/app/contingency`)
+### 5. Contingency Plan (`/app/contingency`)
 
 A secure, compassionate guide for the partner to follow if the primary user dies. Read-only for Partner and Dependent roles; fully editable by Admin.
 
@@ -461,12 +443,26 @@ Organized repository of critical information:
 - Each vault entry has a "last verified" date and a prompt to review annually
 - Printable view (`/contingency/print`) — generates a clean printer-friendly page of the entire guide for physical backup
 
+#### Messages (`/contingency/messages`) — death-triggered messages
+
+The sidebar **Contingency Plan** entry is the **last** item and is an **expandable group** (clickable `/contingency` landing + caret) with sub-links: **`In Case of Death`** (Messages — a **static, parent-neutral** label since either parent could be the deceased), **Checklist**, **Document Vault**.
+
+**Two-parent model.** The parents = **`admin` + `partner_admin`** (e.g. mom + dad). **Authors / possible deceased = the two parents only** — they co-author one shared set of messages for each other and their dependents. **Recipients** = `partner`, `dependent` (+ the surviving parent). Dependents can operate the death gate but **cannot author** messages.
+
+- **One shared death event** (`death_event`, single row): `died_at` is NULL until someone confirms the gate; on confirm it also records `deceased_user_ids` — the parent(s) who passed (1, or **both**). Delivery is **pull** — messages become visible on the Messages page once due, filtered to those **authored by a deceased parent**.
+- **Message** (`goodbye_messages`): targets **either a role** or a **specific person** (`audience_user_id`) — enforced by a `num_nonnulls(audience_role, audience_user_id)=1` CHECK. The audience picker offers **Everyone**, **All Dependents**, then **each recipient listed by name** (the `role:partner` / `role:partner_admin` group options were removed; a specific partner is reached by their name). **Kinds**: `main` (shown first; text or video) · `letter` · `video` · `audio` · `gallery` · `open_when` (milestone letter). Video/audio/photos are **external links** (no object storage). **Release**: `immediate` · `offset` (N days/months/years after death; labeled "Specific time after death") · `date` (fixed) · `milestone` ("open when…", recipient self-opens) · `recurring_annual`.
+- **Single page, role-branched** (`/contingency/messages`, `MessagesClient`): there is **no separate `/manage` route**. **Authors** (both parents) see the authoring UI inline — table of messages + Add/Edit modal — **and** the death gate below it (a surviving parent can confirm the other's death); **Reset death status** shows once death is confirmed. **Recipients** (partner/dependent) see the gate → delivery.
+- **Death gate** (before death, shown to everyone — parent-neutral): "When a parent passes away there will be individual messages left here for you. **Has a parent passed away?**" with large **Yes** / **No** buttons. **No** → a comfort message. **Yes** → a **type-to-confirm** modal that (a) picks **who passed** — each existing parent by name, plus **Both** when there are two parents — and (b) requires the exact phrase "I understand this decision is irreversible." **Confirm Decision** (primary, disabled until a pick + the phrase match) + **Cancel and go back** (red/danger; recipients → `/contingency`, authors just close). Confirm → sets `died_at` + `deceased_user_ids`, emails the **surviving parent(s)** (`sendDeathTriggerEmail`), refreshes to the delivery view.
+- The recipient-facing **delivery/display page is stubbed** (full experience is a later task).
+
+**Messages API** (`app/api/contingency/goodbyes/` — path retained internally): `GET/POST /messages`, `PUT/DELETE /messages/[id]` (author-only = admin|partner_admin); `GET /status` (any auth; returns `died_at`, `confirmed_by`, `deceased_user_ids`); `POST /confirm-death` (any auth; body `{ deceased_ids: [] }` — 1–2 ids that must be parents; idempotent, sets `died_at` + `deceased_user_ids`, emails survivors); `POST /reset-death` (parent-only = admin|partner_admin; clears `died_at`/`confirmed_by`/`deceased_user_ids`).
+
 ---
 
 ## Data Models (PostgreSQL)
 
 ```
-users               id, email, password_hash, role (admin|partner|dependent), created_at, updated_at
+users               id, email, password_hash, role (admin|partner_admin|partner|dependent), created_at, updated_at
 user_profiles       id, user_id (FK), first_name, last_name, date_of_birth, phone, address_line1, address_line2, city, state, postal_code, country, avatar_url (nullable), created_at, updated_at
 plaid_items         id, user_id (FK), access_token, item_id (unique), institution_name, created_at, updated_at
 accounts            id, user_id (FK), name, institution, type (checking|savings|investment|brokerage|retirement|real_estate|credit_card|mortgage|car_loan|student_loan|other_debt), balance, currency, plaid_account_id (nullable, unique), plaid_item_id (FK nullable), last_synced_at, created_at, updated_at
@@ -488,6 +484,9 @@ too_hard_entries    id, user_id (FK), ticker, company_name, reason (text), dismi
 checklist_items     id, category, sort_order, title, description, created_by (FK users), created_at, updated_at
 checklist_progress  id, item_id (FK), user_id (FK), completed, notes, completed_at, updated_at
 vault_entries       id, category, title, fields (jsonb), last_verified_at, created_at, updated_at
+death_event         id, singleton (bool, UNIQUE — one row), died_at (nullable — set on gate confirm, parent-resettable), confirmed_by (FK users nullable), deceased_user_ids (uuid[] nullable — the parent(s) who passed; validated in the API as role admin|partner_admin), created_at, updated_at
+goodbye_messages    id, author_id (FK users), kind (main|letter|video|audio|gallery|open_when), audience_role (nullable — everyone|partner|dependent|partner_admin), audience_user_id (FK users nullable) [CHECK exactly one audience set], title, body, media_url (external link), release_mode (immediate|offset|date|milestone|recurring_annual), offset_amount (int nullable), offset_unit (days|months|years nullable), release_date (nullable), milestone_label (nullable), sort_order, created_at, updated_at
+goodbye_gallery_images id, message_id (FK goodbye_messages, cascade), image_url, caption (nullable), sort_order, created_at, updated_at
 contacts            id, name, role, firm, phone, email, notes, created_at, updated_at
 ```
 
@@ -508,7 +507,8 @@ contacts            id, name, role, firm, phone, email, notes, created_at, updat
 /investing/watchlist/[ticker]
 /investing/too-hard
 
-/contingency
+/contingency                   (Contingency Plan — sidebar's last group)
+/contingency/messages          ("In Case of Death" — authoring UI + gate (parents) / death gate + delivery stub (recipients))
 /contingency/checklist
 /contingency/vault
 /contingency/vault/[category]

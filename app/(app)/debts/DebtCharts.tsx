@@ -6,6 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts'
 import { DebtAccount, latestBalance, totalPaidOff } from './types'
+import { valueOnOrBefore } from '@/lib/snapshots'
 
 type Dimension = 'category' | 'debt'
 
@@ -19,21 +20,10 @@ const COLORS = [
   '#be123c', '#b45309',
 ]
 
-// Carry-forward: the debt's most recent balance on or before `day`. Returns null
-// when the debt has no snapshot yet as of that date (it doesn't exist yet, so it
-// contributes $0 to the total and leaves a gap on its own line).
-function balanceAsOf(d: DebtAccount, day: string): number | null {
-  let bestDate = ''
-  let bestBal: number | null = null
-  for (const s of d.snapshots) {
-    const sd = s.as_of.slice(0, 10)
-    if (sd <= day && sd >= bestDate) {
-      bestDate = sd
-      bestBal = parseFloat(s.balance)
-    }
-  }
-  return bestBal
-}
+// Carry-forward: the debt's most recent balance on or before `day` (null before
+// its first snapshot). Shared with the dashboard net-worth trend.
+const balanceAsOf = (d: DebtAccount, day: string): number | null =>
+  valueOnOrBefore(d.snapshots, day, (s) => parseFloat(s.balance))
 
 const fmtUsd = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 const fmtUsdFull = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`

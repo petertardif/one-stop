@@ -6,6 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts'
 import { Investment, latestValue } from './types'
+import { valueOnOrBefore } from '@/lib/snapshots'
 
 type Dimension = 'owner' | 'type'
 
@@ -15,21 +16,10 @@ const COLORS = [
   '#ca8a04', '#be123c',
 ]
 
-// Carry-forward: the account's most recent value on or before `day`. Returns
-// null when the account has no snapshot yet as of that date (it doesn't exist
-// yet, so it contributes $0 to the total and leaves a gap on its own line).
-function valueAsOf(inv: Investment, day: string): number | null {
-  let bestDate = ''
-  let bestVal: number | null = null
-  for (const s of inv.snapshots) {
-    const sd = s.as_of.slice(0, 10)
-    if (sd <= day && sd >= bestDate) {
-      bestDate = sd
-      bestVal = parseFloat(s.value)
-    }
-  }
-  return bestVal
-}
+// Carry-forward: the account's most recent value on or before `day` (null before
+// its first snapshot). Shared with the dashboard net-worth trend.
+const valueAsOf = (inv: Investment, day: string): number | null =>
+  valueOnOrBefore(inv.snapshots, day, (s) => parseFloat(s.value))
 
 const fmtUsd = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 const fmtUsdFull = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
