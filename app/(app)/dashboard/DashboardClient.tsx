@@ -1,6 +1,6 @@
 'use client'
 
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import {
   BarChart,
   Bar,
@@ -14,99 +14,43 @@ import {
   ReferenceLine,
 } from 'recharts'
 import Link from 'next/link'
-import { Pencil, Plus, Check, X } from 'lucide-react'
-import { useState, useRef } from 'react'
+import { CalendarClock, Receipt, Repeat, Car } from 'lucide-react'
 import { Spinner } from '@/components/Spinner'
-import { PlaidLinkButton } from '@/components/PlaidLinkButton'
-import { Tooltip } from '@/components/Tooltip'
-
-interface Account {
-  id: string
-  name: string
-  institution: string | null
-  type: string
-  balance: string
-  currency: string
-  plaid_account_id: string | null
-  last_synced_at: string | null
-  interest_rate: string | null
-  minimum_payment: string | null
-}
 
 interface NetWorthPoint {
   date: string
+  assets: number
+  liabilities: number
   netWorth: number
 }
 
 interface DashboardData {
   netWorth: { assets: number; liabilities: number; netWorth: number }
-  accountsByType: Record<string, Account[]>
-  cashFlow: { income: number; expenses: number }
-  debts: Account[]
   netWorthHistory: NetWorthPoint[]
-}
-
-const GROUP_ORDER = ['Checking & Savings', 'Investments', 'Real Estate', 'Debt']
-
-const DEBT_LABEL: Record<string, string> = {
-  credit_card: 'Credit Card',
-  mortgage: 'Mortgage',
-  car_loan: 'Car Loan',
-  student_loan: 'Student Loan',
-  other_debt: 'Other Debt',
+  cashFlow: { income: number; expenses: number }
+  weekly: { week_start: string; remaining: number; spent: number }
+  monthlyBills: { nextMonthly: number; monthlyAverage: number }
+  subscriptions: { perYear: number; perMonth: number }
+  auto: { ytd: number }
 }
 
 function fmt(n: number) {
   return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 }
 
-function fmtDate(iso: string | null) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function fmtPct(n: number | null) {
-  if (n === null) return '—'
-  return `${n.toFixed(2)}%`
-}
-
-type PayoffMethod = 'avalanche' | 'snowball'
-
-function payoffOrder(debts: Account[], method: PayoffMethod): Account[] {
-  if (method === 'avalanche') {
-    return [...debts].sort((a, b) => {
-      const rA = a.interest_rate ? parseFloat(a.interest_rate) : 0
-      const rB = b.interest_rate ? parseFloat(b.interest_rate) : 0
-      return rB - rA
-    })
+function userTz() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  } catch {
+    return 'UTC'
   }
-  return [...debts].sort((a, b) =>
-    Math.abs(parseFloat(a.balance)) - Math.abs(parseFloat(b.balance))
-  )
 }
 
-export function DashboardClient({ firstName, isAdmin }: { firstName: string; isAdmin: boolean }) {
-  const queryClient = useQueryClient()
-  const [editingBalance, setEditingBalance] = useState<string | null>(null)
-  const balanceInputRef = useRef<HTMLInputElement>(null)
-  const [payoffMethod, setPayoffMethod] = useState<PayoffMethod>('avalanche')
-
-  async function saveBalance(accountId: string, value: string) {
-    const num = parseFloat(value)
-    if (isNaN(num)) { setEditingBalance(null); return }
-    await fetch(`/api/accounts/${accountId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ balance: num }),
-    })
-    setEditingBalance(null)
-    queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-  }
-
+export function DashboardClient({ firstName }: { firstName: string }) {
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: async () => {
-      const res = await fetch('/api/dashboard')
+      const res = await fetch(`/api/dashboard?tz=${encodeURIComponent(userTz())}`)
       if (!res.ok) throw new Error('Failed to load dashboard')
       return res.json()
     },
@@ -114,16 +58,13 @@ export function DashboardClient({ firstName, isAdmin }: { firstName: string; isA
 
   if (isLoading || !data) return <Spinner />
 
-  const { netWorth, accountsByType, cashFlow, debts, netWorthHistory } = data
+  const { netWorth, netWorthHistory, cashFlow, weekly, monthlyBills, subscriptions, auto } = data
   const nwPositive = netWorth.netWorth >= 0
 
   const cashFlowChartData = [
     { name: 'Income', value: cashFlow.income },
     { name: 'Expenses', value: cashFlow.expenses },
   ]
-
-  const orderedDebts = payoffOrder(debts, payoffMethod)
-  const hasDebtDetails = debts.some((d) => d.interest_rate || d.minimum_payment)
 
   const nwChartData = netWorthHistory.map((p) => ({
     ...p,
@@ -136,7 +77,7 @@ export function DashboardClient({ firstName, isAdmin }: { firstName: string; isA
         <h1>Welcome back, {firstName}</h1>
       </div>
 
-      {/* Net Worth */}
+      {/* Net Worth (Investments − Debts) */}
       <section className="dashboard__section">
         <h2 className="dashboard__section-title">Net Worth</h2>
         <div className="stat-cards">
@@ -189,210 +130,67 @@ export function DashboardClient({ firstName, isAdmin }: { firstName: string; isA
         )}
       </section>
 
-      {/* Accounts Panel + Cash Flow side by side */}
-      <div className="dashboard__row">
-        {/* Accounts Panel */}
-        <section className="dashboard__section dashboard__section--accounts">
-          <div className="dashboard__section-header">
-            <h2 className="dashboard__section-title">Accounts</h2>
-            {isAdmin && (
-              <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-                <PlaidLinkButton />
-                <Link href="/dashboard/accounts/new" className="btn-sm btn-secondary">
-                  <Plus size={14} /> Account
-                </Link>
-              </div>
-            )}
-          </div>
-          {GROUP_ORDER.map((group) => {
-            const accounts = accountsByType[group]
-            if (!accounts?.length) return null
-            const groupTotal = accounts.reduce((s, a) => s + parseFloat(a.balance), 0)
-            return (
-              <div key={group} className="accounts-group">
-                <div className="accounts-group__header">
-                  <span>{group}</span>
-                  <span className={groupTotal >= 0 ? 'positive' : 'negative'}>{fmt(Math.abs(groupTotal))}</span>
-                </div>
-                {accounts.map((acct) => (
-                  <div key={acct.id} className="account-row">
-                    <div className="account-row__info">
-                      <span className="account-row__name">{acct.name}</span>
-                      {acct.institution && (
-                        <span className="account-row__institution">{acct.institution}</span>
-                      )}
-                    </div>
-                    <div className="account-row__right">
-                      {editingBalance === acct.id ? (
-                        <div className="account-row__balance-edit">
-                          <input
-                            ref={balanceInputRef}
-                            type="number"
-                            step="0.01"
-                            defaultValue={parseFloat(acct.balance)}
-                            className="account-row__balance-input"
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') saveBalance(acct.id, e.currentTarget.value)
-                              if (e.key === 'Escape') setEditingBalance(null)
-                            }}
-                          />
-                          <Tooltip text="Save">
-                            <button className="btn-icon" onClick={() => saveBalance(acct.id, balanceInputRef.current?.value ?? '')}>
-                              <Check size={13} />
-                            </button>
-                          </Tooltip>
-                          <Tooltip text="Cancel">
-                            <button className="btn-icon" onClick={() => setEditingBalance(null)}>
-                              <X size={13} />
-                            </button>
-                          </Tooltip>
-                        </div>
-                      ) : (
-                        <>
-                          <span className={`account-row__balance ${parseFloat(acct.balance) >= 0 ? 'positive' : 'negative'}`}>
-                            {fmt(Math.abs(parseFloat(acct.balance)))}
-                          </span>
-                          {acct.last_synced_at && (
-                            <span className="account-row__synced">Synced {fmtDate(acct.last_synced_at)}</span>
-                          )}
-                          {isAdmin && (
-                            <Tooltip text="Update balance">
-                              <button
-                                className="account-row__edit"
-                                onClick={() => setEditingBalance(acct.id)}
-                              >
-                                <Pencil size={13} />
-                              </button>
-                            </Tooltip>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-          })}
-          {Object.keys(accountsByType).length === 0 && (
-            <p className="dashboard__empty">No accounts yet. Add an account to get started.</p>
-          )}
-        </section>
-
-        {/* Right column: Cash Flow + Debt */}
-        <div className="dashboard__col">
-          {/* Monthly Cash Flow */}
-          <section className="dashboard__section">
-            <h2 className="dashboard__section-title">Cash Flow — {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</h2>
-            <div className="stat-cards stat-cards--small">
-              <div className="stat-card">
-                <span className="stat-card__label">Income</span>
-                <span className="stat-card__value stat-card--positive">{fmt(cashFlow.income)}</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-card__label">Expenses</span>
-                <span className="stat-card__value stat-card--negative">{fmt(cashFlow.expenses)}</span>
-              </div>
-            </div>
-            {(cashFlow.income > 0 || cashFlow.expenses > 0) ? (
-              <div className="chart-wrap">
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={cashFlowChartData} barCategoryGap="40%">
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--text-secondary)' }} />
-                    <YAxis hide />
-                    <ChartTooltip
-                      formatter={(v) => fmt(Number(v))}
-                      contentStyle={{ border: '1px solid var(--surface-border)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}
-                    />
-                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                      <Cell fill="#22c55e" />
-                      <Cell fill="#ef4444" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <p className="dashboard__empty">No transactions recorded this month.</p>
-            )}
-          </section>
-
-          {/* Debt Snapshot */}
-          <section className="dashboard__section">
-            <div className="dashboard__section-header">
-              <h2 className="dashboard__section-title">Debt Snapshot</h2>
-              {debts.length > 0 && (
-                <div className="payoff-toggle">
-                  <Tooltip text="Highest interest rate first">
-                    <button
-                      className={`payoff-toggle__btn${payoffMethod === 'avalanche' ? ' payoff-toggle__btn--active' : ''}`}
-                      onClick={() => setPayoffMethod('avalanche')}
-                    >
-                      Avalanche
-                    </button>
-                  </Tooltip>
-                  <Tooltip text="Lowest balance first">
-                    <button
-                      className={`payoff-toggle__btn${payoffMethod === 'snowball' ? ' payoff-toggle__btn--active' : ''}`}
-                      onClick={() => setPayoffMethod('snowball')}
-                    >
-                      Snowball
-                    </button>
-                  </Tooltip>
-                </div>
-              )}
-            </div>
-            {debts.length > 0 ? (
-              <>
-                <div className="stat-cards stat-cards--small">
-                  <div className="stat-card">
-                    <span className="stat-card__label">Total Debt</span>
-                    <span className="stat-card__value stat-card--negative">
-                      {fmt(debts.reduce((s, d) => s + Math.abs(parseFloat(d.balance)), 0))}
-                    </span>
-                  </div>
-                </div>
-                <div className="ledger-table-wrap">
-                <table className="debt-table">
-                  <thead>
-                    <tr>
-                      <th>Priority</th>
-                      <th>Account</th>
-                      <th>Type</th>
-                      <th className="col-right">Balance</th>
-                      {hasDebtDetails && <th className="col-right">Rate</th>}
-                      {hasDebtDetails && <th className="col-right">Min. Payment</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orderedDebts.map((d, i) => (
-                      <tr key={d.id}>
-                        <td className="debt-priority">{i + 1}</td>
-                        <td>{d.name}</td>
-                        <td>{DEBT_LABEL[d.type] ?? d.type}</td>
-                        <td className="col-right negative">{fmt(Math.abs(parseFloat(d.balance)))}</td>
-                        {hasDebtDetails && (
-                          <td className="col-right">{d.interest_rate ? fmtPct(parseFloat(d.interest_rate)) : '—'}</td>
-                        )}
-                        {hasDebtDetails && (
-                          <td className="col-right">{d.minimum_payment ? fmt(parseFloat(d.minimum_payment)) : '—'}</td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                </div>
-                <p className="debt-method-hint">
-                  {payoffMethod === 'avalanche'
-                    ? 'Avalanche: pay minimums on all, put extra toward highest-rate debt first. Saves the most interest.'
-                    : 'Snowball: pay minimums on all, put extra toward smallest balance first. Builds momentum.'}
-                </p>
-              </>
-            ) : (
-              <p className="dashboard__empty">No debt accounts.</p>
-            )}
-          </section>
+      {/* Module summary tiles — each links to its section */}
+      <section className="dashboard__section">
+        <h2 className="dashboard__section-title">At a Glance</h2>
+        <div className="dashboard__tiles">
+          <Link href="/monthly" className="dashboard-tile">
+            <span className="dashboard-tile__label"><CalendarClock size={16} /> This Week&apos;s 1k</span>
+            <span className={`dashboard-tile__value ${weekly.remaining < 0 ? 'negative' : ''}`}>{fmt(weekly.remaining)}</span>
+            <span className="dashboard-tile__sub">{fmt(weekly.spent)} spent</span>
+          </Link>
+          <Link href="/budget" className="dashboard-tile">
+            <span className="dashboard-tile__label"><Receipt size={16} /> Monthly Bills</span>
+            <span className="dashboard-tile__value">{fmt(monthlyBills.nextMonthly)}<small>/mo</small></span>
+            <span className="dashboard-tile__sub">12-mo avg {fmt(monthlyBills.monthlyAverage)}</span>
+          </Link>
+          <Link href="/subscriptions" className="dashboard-tile">
+            <span className="dashboard-tile__label"><Repeat size={16} /> Subscriptions</span>
+            <span className="dashboard-tile__value">{fmt(subscriptions.perYear)}<small>/yr</small></span>
+            <span className="dashboard-tile__sub">{fmt(subscriptions.perMonth)}/mo</span>
+          </Link>
+          <Link href="/auto" className="dashboard-tile">
+            <span className="dashboard-tile__label"><Car size={16} /> Auto Service</span>
+            <span className="dashboard-tile__value">{fmt(auto.ytd)}</span>
+            <span className="dashboard-tile__sub">this year</span>
+          </Link>
         </div>
-      </div>
+      </section>
+
+      {/* Monthly Cash Flow */}
+      <section className="dashboard__section">
+        <h2 className="dashboard__section-title">Cash Flow — {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</h2>
+        <div className="stat-cards stat-cards--small">
+          <div className="stat-card">
+            <span className="stat-card__label">Income</span>
+            <span className="stat-card__value stat-card--positive">{fmt(cashFlow.income)}</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-card__label">Expenses</span>
+            <span className="stat-card__value stat-card--negative">{fmt(cashFlow.expenses)}</span>
+          </div>
+        </div>
+        {(cashFlow.income > 0 || cashFlow.expenses > 0) ? (
+          <div className="chart-wrap">
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={cashFlowChartData} barCategoryGap="40%">
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--text-secondary)' }} />
+                <YAxis hide />
+                <ChartTooltip
+                  formatter={(v) => fmt(Number(v))}
+                  contentStyle={{ border: '1px solid var(--surface-border)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}
+                />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                  <Cell fill="#22c55e" />
+                  <Cell fill="#ef4444" />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <p className="dashboard__empty">No transactions recorded this month.</p>
+        )}
+      </section>
     </div>
   )
 }

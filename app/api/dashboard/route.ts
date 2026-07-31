@@ -1,50 +1,77 @@
 import { getServerSession } from 'next-auth'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { authOptions } from '@/lib/auth'
 import { query } from '@/lib/db'
+import { resolveTimeZone } from '@/lib/timezone'
+import { getWeeklyBudget } from '@/lib/weeklyBudget'
+import { valueOnOrBefore } from '@/lib/snapshots'
 
-const ASSET_TYPES = ['checking', 'savings', 'investment', 'brokerage', 'retirement', 'real_estate']
-const DEBT_TYPES = ['credit_card', 'mortgage', 'car_loan', 'student_loan', 'other_debt']
+// The dashboard is derived entirely from the feature modules (Investments, Debts,
+// Ledger, Budget, Subscriptions, Auto) — not the legacy `accounts` table. Net
+// worth = active investments (assets) − active debts (liabilities), with an
+// over-time trend built by carrying each account's latest snapshot forward.
 
-interface AccountRow {
-  id: string
-  name: string
-  institution: string | null
-  type: string
-  balance: string
-  currency: string
-  plaid_account_id: string | null
-  last_synced_at: string | null
-  interest_rate: string | null
-  minimum_payment: string | null
+interface SnapRow {
+  account_id: string
+  as_of: string
+  amount: string
 }
 
-interface CashFlowRow {
-  type: string
-  total: string
+interface SnapPoint {
+  as_of: string
+  amount: number
+}
+type AcctSeries = Map<string, SnapPoint[]>
+
+function groupByAccount(rows: SnapRow[]): AcctSeries {
+  const m: AcctSeries = new Map()
+  for (const r of rows) {
+    const arr = m.get(r.account_id) ?? []
+    arr.push({ as_of: r.as_of, amount: parseFloat(r.amount) })
+    m.set(r.account_id, arr)
+  }
+  return m
 }
 
-interface SnapshotRow {
-  snapshot_date: string
-  net_worth: string
+const sumAsOf = (series: AcctSeries, day: string): number =>
+  Array.from(series.values()).reduce(
+    (s, arr) => s + (valueOnOrBefore<SnapPoint>(arr, day, (x) => x.amount) ?? 0),
+    0
+  )
+
+// "Today" in the caller's timezone as YYYY-MM-DD (en-CA formats that way).
+const todayInTz = (tz: string): string =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
+
+function subtractMonths(day: string, months: number): string {
+  const d = new Date(day + 'T00:00:00Z')
+  d.setUTCMonth(d.getUTCMonth() - months)
+  return d.toISOString().slice(0, 10)
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const userId = session.user.id
+  const tz = resolveTimeZone(new URL(req.url).searchParams.get('tz'))
 
-  const [accountsResult, cashFlowResult, historyResult] = await Promise.all([
-    query<AccountRow>(
-      `SELECT id, name, institution, type, balance, currency, plaid_account_id, last_synced_at,
-              interest_rate, minimum_payment
-       FROM accounts
-       WHERE user_id = $1
-       ORDER BY type, name`,
+  const [invSnaps, debtSnaps, cashFlow, monthlyAvg, nextMonthly, subs, auto, weekly] = await Promise.all([
+    query<SnapRow>(
+      `SELECT s.investment_id AS account_id, to_char(s.as_of, 'YYYY-MM-DD') AS as_of, s.value AS amount
+       FROM investment_snapshots s
+       JOIN investments i ON i.id = s.investment_id
+       WHERE i.user_id = $1 AND i.liquidated_at IS NULL`,
       [userId]
     ),
-    query<CashFlowRow>(
+    query<SnapRow>(
+      `SELECT s.debt_account_id AS account_id, to_char(s.as_of, 'YYYY-MM-DD') AS as_of, s.balance AS amount
+       FROM debt_snapshots s
+       JOIN debt_accounts d ON d.id = s.debt_account_id
+       WHERE d.user_id = $1 AND d.paid_at IS NULL`,
+      [userId]
+    ),
+    query<{ type: string; total: string }>(
       `SELECT type, SUM(amount) AS total
        FROM transactions
        WHERE user_id = $1
@@ -53,80 +80,83 @@ export async function GET() {
        GROUP BY type`,
       [userId]
     ),
-    query<SnapshotRow>(
-      `SELECT TO_CHAR(snapshot_date, 'YYYY-MM-DD') AS snapshot_date, net_worth
-       FROM net_worth_snapshots
-       WHERE user_id = $1
-         AND snapshot_date >= CURRENT_DATE - INTERVAL '12 months'
-       ORDER BY snapshot_date ASC`,
+    query<{ monthly_average: string }>(
+      `SELECT COALESCE(-SUM(amount), 0) / 12 AS monthly_average
+       FROM transactions
+       WHERE user_id = $1 AND category = 'MONTHLY BILLS'
+         AND date >= (CURRENT_DATE - INTERVAL '12 months')`,
       [userId]
     ),
+    query<{ next_monthly: string }>(
+      `SELECT COALESCE(SUM(amount * CASE duration
+                 WHEN 'annual' THEN 1 WHEN 'monthly' THEN 12
+                 WHEN 'biweekly' THEN 26 WHEN 'weekly' THEN 52 ELSE 1 END) / 12, 0) AS next_monthly
+       FROM budget_items
+       WHERE user_id = $1 AND archived_at IS NULL`,
+      [userId]
+    ),
+    query<{ per_year: string; per_month: string }>(
+      `SELECT COALESCE(SUM(price_per_year), 0) AS per_year,
+              COALESCE(SUM(price_per_month), 0) AS per_month
+       FROM subscriptions
+       WHERE user_id = $1 AND cancelled_at IS NULL`,
+      [userId]
+    ),
+    query<{ ytd: string }>(
+      `SELECT COALESCE(SUM(cost), 0) AS ytd
+       FROM auto_services
+       WHERE user_id = $1 AND date >= date_trunc('year', CURRENT_DATE)`,
+      [userId]
+    ),
+    getWeeklyBudget(userId, null, tz),
   ])
 
-  const accounts = accountsResult.rows
-  const cashFlowRows = cashFlowResult.rows
+  const today = todayInTz(tz)
+  const invByAcct = groupByAccount(invSnaps.rows)
+  const debtByAcct = groupByAccount(debtSnaps.rows)
 
-  const assets = accounts
-    .filter((a) => ASSET_TYPES.includes(a.type))
-    .reduce((sum, a) => sum + parseFloat(a.balance), 0)
+  const assets = sumAsOf(invByAcct, today)
+  const liabilities = sumAsOf(debtByAcct, today)
 
-  const liabilities = accounts
-    .filter((a) => DEBT_TYPES.includes(a.type))
-    .reduce((sum, a) => sum + Math.abs(parseFloat(a.balance)), 0)
-
-  const netWorthValue = assets - liabilities
-
-  // Upsert today's snapshot
-  await query(
-    `INSERT INTO net_worth_snapshots (user_id, snapshot_date, net_worth, assets, liabilities)
-     VALUES ($1, CURRENT_DATE, $2, $3, $4)
-     ON CONFLICT (user_id, snapshot_date) DO UPDATE
-       SET net_worth = EXCLUDED.net_worth,
-           assets = EXCLUDED.assets,
-           liabilities = EXCLUDED.liabilities,
-           updated_at = NOW()`,
-    [userId, netWorthValue, assets, liabilities]
-  )
-
-  const accountsByType: Record<string, AccountRow[]> = {}
-  for (const acct of accounts) {
-    const group = displayGroup(acct.type)
-    if (!accountsByType[group]) accountsByType[group] = []
-    accountsByType[group].push(acct)
+  // Net-worth trend: every distinct snapshot date (plus today), carried forward
+  // per account, limited to the last 12 months.
+  const cutoff = subtractMonths(today, 12)
+  const dateSet = new Set<string>([today])
+  for (const arr of [...Array.from(invByAcct.values()), ...Array.from(debtByAcct.values())]) {
+    for (const s of arr) dateSet.add(s.as_of)
   }
+  const netWorthHistory = Array.from(dateSet)
+    .filter((d) => d >= cutoff)
+    .sort()
+    .map((day) => {
+      const a = sumAsOf(invByAcct, day)
+      const l = sumAsOf(debtByAcct, day)
+      return { date: day, assets: a, liabilities: l, netWorth: a - l }
+    })
 
-  const income = cashFlowRows.find((r) => r.type === 'income')
-  const expenses = cashFlowRows.find((r) => r.type === 'expense')
-
-  const debts = accounts
-    .filter((a) => DEBT_TYPES.includes(a.type))
-    .sort((a, b) => Math.abs(parseFloat(b.balance)) - Math.abs(parseFloat(a.balance)))
-
-  // Merge today's snapshot into history if not already there
-  const history = historyResult.rows
-  const todayStr = new Date().toISOString().slice(0, 10)
-  if (!history.find((r) => r.snapshot_date === todayStr)) {
-    history.push({ snapshot_date: todayStr, net_worth: String(netWorthValue) })
-  }
+  const income = cashFlow.rows.find((r) => r.type === 'income')
+  const expenses = cashFlow.rows.find((r) => r.type === 'expense')
 
   return NextResponse.json({
-    netWorth: { assets, liabilities, netWorth: netWorthValue },
-    accountsByType,
+    netWorth: { assets, liabilities, netWorth: assets - liabilities },
+    netWorthHistory,
     cashFlow: {
       income: income ? parseFloat(income.total) : 0,
       expenses: expenses ? Math.abs(parseFloat(expenses.total)) : 0,
     },
-    debts,
-    netWorthHistory: history.map((r) => ({
-      date: r.snapshot_date,
-      netWorth: parseFloat(r.net_worth),
-    })),
+    weekly: {
+      week_start: weekly.week_start,
+      remaining: parseFloat(weekly.remaining),
+      spent: parseFloat(weekly.spent),
+    },
+    monthlyBills: {
+      nextMonthly: parseFloat(nextMonthly.rows[0].next_monthly),
+      monthlyAverage: parseFloat(monthlyAvg.rows[0].monthly_average),
+    },
+    subscriptions: {
+      perYear: parseFloat(subs.rows[0].per_year),
+      perMonth: parseFloat(subs.rows[0].per_month),
+    },
+    auto: { ytd: parseFloat(auto.rows[0].ytd) },
   })
-}
-
-function displayGroup(type: string): string {
-  if (type === 'checking' || type === 'savings') return 'Checking & Savings'
-  if (type === 'investment' || type === 'brokerage' || type === 'retirement') return 'Investments'
-  if (type === 'real_estate') return 'Real Estate'
-  return 'Debt'
 }

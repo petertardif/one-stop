@@ -78,6 +78,36 @@ function MarkAsMenu({ disabled, onPick }: { disabled: boolean; onPick: (field: M
   )
 }
 
+// Toolbar "+ Add" dropdown (filled primary): New Transaction opens the add-tx
+// modal; Amount to 1k Weekly opens the weekly top-up modal. Closes on pick,
+// outside-click, or Escape.
+function AddMenu({ onNewTransaction, onAddWeekly }: { onNewTransaction: () => void; onAddWeekly: () => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey) }
+  }, [open])
+
+  return (
+    <div className="mark-menu" ref={ref}>
+      <button className="primary" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open}>
+        <Plus size={14} /> Add <ChevronDown size={14} />
+      </button>
+      {open && (
+        <div className="mark-menu__list mark-menu__list--right" role="menu">
+          <button role="menuitem" onClick={() => { setOpen(false); onNewTransaction() }}><Plus size={14} /> New Transaction</button>
+          <button role="menuitem" onClick={() => { setOpen(false); onAddWeekly() }}><Wallet size={14} /> Amount to 1k Weekly</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 interface Transaction {
   id: string
   account_id: string | null
@@ -119,7 +149,7 @@ interface TxForm {
 
 const emptyTx = (): TxForm => ({
   id: null, account_id: '', amount: '', type: 'expense', category: '',
-  description: '', check_number: '', date: new Date().toISOString().slice(0, 10),
+  description: '', check_number: '', date: todayLocal(),
   is_posted: false, budget_account: 'chase_cc', notes: '',
 })
 
@@ -183,6 +213,13 @@ function buildPeriodLabel(period: Period): string {
 function currentMonthPeriod(): string {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+// Today as YYYY-MM-DD in the user's local timezone (not UTC — `toISOString()`
+// would roll to tomorrow after ~5pm in the Americas).
+function todayLocal(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
 function adjacentMonth(period: string, direction: -1 | 1): string {
@@ -625,12 +662,10 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
           >
             <Trash2 size={14} /> Delete
           </button>
-          <button onClick={run(() => { setBudgetWeek(weekStartOf(new Date())); budgetDialogRef.current?.showModal() })}>
-            <Wallet size={14} /> Add to 1k Weekly
-          </button>
-          <button className="primary" onClick={run(openAddTx)}>
-            <Plus size={14} /> Add
-          </button>
+          <AddMenu
+            onNewTransaction={run(openAddTx)}
+            onAddWeekly={run(() => { setBudgetWeek(weekStartOf(new Date())); budgetDialogRef.current?.showModal() })}
+          />
         </div>
       </>
     )

@@ -19,6 +19,5 @@ export default async function DashboardPage() {
   const firstName = result.rows[0]?.first_name
   if (!firstName) redirect('/settings/profile?requireProfile=1')
 
-  const isAdmin = session.user.role === 'admin'
-  return <DashboardClient firstName={firstName} isAdmin={isAdmin} />
+  return <DashboardClient firstName={firstName} />
 }

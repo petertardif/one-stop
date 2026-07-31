@@ -29,7 +29,7 @@ const DASHBOARD_ITEM: NavItem = {
 }
 
 const CONTINGENCY_ITEM: NavItem = {
-  label: 'In Case I Die',
+  label: 'Contingency Plan',
   href: '/contingency',
   icon: <Heart size={18} />,
 }
@@ -63,6 +63,15 @@ export function Sidebar({ role }: SidebarProps) {
   )
   const [financialsOpen, setFinancialsOpen] = useState(isFinancialsActive)
   const [investingOpen, setInvestingOpen] = useState(false)
+
+  const contingencySubItems = [
+    { label: 'In Case of Death', href: '/contingency/messages' },
+    { label: 'Checklist', href: '/contingency/checklist' },
+    { label: 'Document Vault', href: '/contingency/vault' },
+  ]
+  const isContingencyActive =
+    pathname === CONTINGENCY_ITEM.href || pathname.startsWith(CONTINGENCY_ITEM.href + '/')
+  const [contingencyOpen, setContingencyOpen] = useState(isContingencyActive)
 
   // Close the mobile drawer whenever navigation occurs.
   useEffect(() => { setMobileOpen(false) }, [pathname, setMobileOpen])
@@ -155,18 +164,6 @@ export function Sidebar({ role }: SidebarProps) {
             )}
           </li>
 
-          {/* In Case I Die */}
-          <li>
-            <Link
-              href={CONTINGENCY_ITEM.href}
-              className={`sidebar__nav-item${pathname === CONTINGENCY_ITEM.href || pathname.startsWith(CONTINGENCY_ITEM.href + '/') ? ' sidebar__nav-item--active' : ''}`}
-              title={collapsed ? CONTINGENCY_ITEM.label : undefined}
-            >
-              <span className="sidebar__nav-icon">{CONTINGENCY_ITEM.icon}</span>
-              <span className="sidebar__nav-label">{CONTINGENCY_ITEM.label}</span>
-            </Link>
-          </li>
-
           {/* Investing with collapsible sub-menu */}
           <li>
             <div className={`sidebar__nav-item sidebar__nav-item--expandable${pathname === '/investing' ? ' sidebar__nav-item--active' : ''}`}>
@@ -190,6 +187,42 @@ export function Sidebar({ role }: SidebarProps) {
             {investingOpen && !collapsed && (
               <ul className="sidebar__sub-nav">
                 {INVESTING_SUB_ITEMS.map((sub) => (
+                  <li key={sub.href}>
+                    <Link
+                      href={sub.href}
+                      className={`sidebar__sub-item${pathname === sub.href ? ' sidebar__sub-item--active' : ''}`}
+                    >
+                      {sub.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+
+          {/* In Case I Die with collapsible sub-menu (pinned last) */}
+          <li>
+            <div className={`sidebar__nav-item sidebar__nav-item--expandable${pathname === CONTINGENCY_ITEM.href ? ' sidebar__nav-item--active' : ''}`}>
+              <Link
+                href={CONTINGENCY_ITEM.href}
+                className="sidebar__nav-item-main"
+                title={collapsed ? CONTINGENCY_ITEM.label : undefined}
+              >
+                <span className="sidebar__nav-icon">{CONTINGENCY_ITEM.icon}</span>
+                <span className="sidebar__nav-label">{CONTINGENCY_ITEM.label}</span>
+              </Link>
+              <button
+                className={`sidebar__nav-caret${contingencyOpen ? ' sidebar__nav-caret--open' : ''}`}
+                onClick={() => setContingencyOpen((o) => !o)}
+                aria-label={contingencyOpen ? 'Collapse In Case I Die menu' : 'Expand In Case I Die menu'}
+              >
+                <ChevronDown size={14} />
+              </button>
+            </div>
+
+            {contingencyOpen && !collapsed && (
+              <ul className="sidebar__sub-nav">
+                {contingencySubItems.map((sub) => (
                   <li key={sub.href}>
                     <Link
                       href={sub.href}
