@@ -255,7 +255,8 @@
       "Bash(grep -nE \"^\\\\s*\\(input|select|textarea\\)[,{ ]|^\\\\.[a-z-]*\\(input|field|select\\)\" app/globals.css)",
       "Bash(grep -nE \"input\\\\[type|\\\\.modal .*\\(input|select\\)|record-form|^\\\\.record|input,\\\\s|select \\\\{|input \\\\{\" app/globals.css)",
       "Bash(awk 'NR>=3360 && NR<=3370' app/globals.css)",
-      "Bash(grep -n \"ghost-danger\\\\|Delete\\\\` is a ghost\" SPEC.md)"
+      "Bash(grep -n \"ghost-danger\\\\|Delete\\\\` is a ghost\" SPEC.md)",
+      "Bash(exit 0)"
     ],
     "additionalDirectories": [
       "/Users/ptardif/Documents/Code/cabin-app/app/api/bills/[id]",
