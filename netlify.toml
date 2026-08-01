@@ -1,0 +1,13 @@
+# Build command and publish directory come from the Netlify UI; this file intentionally
+# sets only the build environment so those settings keep applying.
+
+[build.environment]
+  # Netlify scans every env var's value against the repo and build output. These four are
+  # not credentials, and each one's value collides with strings we legitimately ship:
+  #   NEXTAUTH_URL - the site's own public URL; also matches next.js/react-dom internals
+  #   SMTP_HOST    - smtp.gmail.com, shipped inside nodemailer's well-known/services.json
+  #   SMTP_USER    - the admin email, used as a WHERE-clause key in db/ migrations and seeds
+  #   PLAID_ENV    - "sandbox", a word that appears throughout next.js and @types/node
+  # Real credentials (DATABASE_URL, NEXTAUTH_SECRET, PLAID_SECRET, PLAID_CLIENT_ID,
+  # SMTP_PASS, FMP_API_KEY) are deliberately NOT listed here and stay scanned.
+  SECRETS_SCAN_OMIT_KEYS = "NEXTAUTH_URL,SMTP_HOST,SMTP_USER,PLAID_ENV"
