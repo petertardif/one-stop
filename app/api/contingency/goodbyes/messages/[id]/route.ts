@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { authOptions } from '@/lib/auth'
 import { query, pool } from '@/lib/db'
-import { isAuthor, messageSchema } from '../route'
+import { isAuthor, messageSchema } from '@/lib/goodbyes'
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
