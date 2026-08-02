@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
+    "email:check": "node --env-file=.env scripts/verify-smtp.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {
