@@ -34,7 +34,13 @@ describe('POST /api/auth/register', () => {
     expect(res.status).toBe(400)
   })
 
-  it('returns 400 for password shorter than 8 characters', async () => {
+  it('returns 400 for a password that fails the complexity rules', async () => {
+    // long enough, but no uppercase, number, or special character
+    const weak = await POST(
+      makeRequest({ token: 'abc', email: 'a@b.com', password: 'alllowercaseonly' })
+    )
+    expect(weak.status).toBe(400)
+
     const res = await POST(makeRequest({ token: 'abc', email: 'a@b.com', password: 'short' }))
     expect(res.status).toBe(400)
   })
@@ -42,7 +48,7 @@ describe('POST /api/auth/register', () => {
   it('returns 400 for invalid or expired invite token', async () => {
     mockValidate.mockResolvedValueOnce(null)
 
-    const res = await POST(makeRequest({ token: 'bad', email: 'a@b.com', password: 'password123' }))
+    const res = await POST(makeRequest({ token: 'bad', email: 'a@b.com', password: 'Passw0rd!2345' }))
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/invalid or expired/i)
@@ -52,7 +58,7 @@ describe('POST /api/auth/register', () => {
     mockValidate.mockResolvedValueOnce(validToken)
     mockQuery.mockResolvedValueOnce({ rows: [{ id: 'existing' }], rowCount: 1 } as never)
 
-    const res = await POST(makeRequest({ token: 'abc', email: 'taken@b.com', password: 'password123' }))
+    const res = await POST(makeRequest({ token: 'abc', email: 'taken@b.com', password: 'Passw0rd!2345' }))
     expect(res.status).toBe(409)
   })
 
@@ -65,10 +71,10 @@ describe('POST /api/auth/register', () => {
     mockHash.mockResolvedValueOnce('hashed-pw' as never)
     mockConsume.mockResolvedValueOnce(undefined)
 
-    const res = await POST(makeRequest({ token: 'abc', email: 'new@b.com', password: 'password123' }))
+    const res = await POST(makeRequest({ token: 'abc', email: 'new@b.com', password: 'Passw0rd!2345' }))
 
     expect(res.status).toBe(201)
-    expect(mockHash).toHaveBeenCalledWith('password123', 12)
+    expect(mockHash).toHaveBeenCalledWith('Passw0rd!2345', 12)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO users'),
       expect.arrayContaining(['new@b.com', 'hashed-pw', 'partner'])
@@ -89,7 +95,7 @@ describe('POST /api/auth/register', () => {
     mockHash.mockResolvedValueOnce('hashed-pw' as never)
     mockConsume.mockResolvedValueOnce(undefined)
 
-    await POST(makeRequest({ token: 'abc', email: 'New@B.COM', password: 'password123' }))
+    await POST(makeRequest({ token: 'abc', email: 'New@B.COM', password: 'Passw0rd!2345' }))
 
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO users'),

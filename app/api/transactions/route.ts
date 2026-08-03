@@ -29,7 +29,12 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const accountId = searchParams.get('account_id')
   const period = searchParams.get('period') // 'all' | 'YYYY' | '3m' | '6m' | 'YYYY-MM'
-  const category = searchParams.get('category') // 'all' | a category name
+  // Repeated `category` params (?category=GAS&category=HOUSE) = multi-select from the
+  // Category column header. Absent, or the legacy single 'all', means every category.
+  const categories = searchParams.getAll('category').filter((c) => c && c !== 'all')
+  // 'all' | 'posted' | 'unposted' -- the Posted column header filter.
+  const postedParam = searchParams.get('posted')
+  const posted = postedParam === 'posted' || postedParam === 'unposted' ? postedParam : 'all'
   const tz = resolveTimeZone(searchParams.get('tz'))
 
   // Server-side pagination (newest-first). pageSize is restricted to the dropdown
@@ -53,9 +58,14 @@ export async function GET(req: NextRequest) {
     params.push(accountId)
   }
 
-  if (category && category !== 'all') {
-    conditions.push(`l.category = $${paramIdx++}`)
-    params.push(category)
+  if (categories.length > 0) {
+    conditions.push(`l.category = ANY($${paramIdx++})`)
+    params.push(categories)
+  }
+
+  if (posted !== 'all') {
+    conditions.push(`l.is_posted = $${paramIdx++}`)
+    params.push(posted === 'posted')
   }
 
   if (period && period !== 'all') {

@@ -6,10 +6,11 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useRouter } from 'next/navigation'
 import { ErrorMessage } from '@/components/ErrorMessage'
+import { passwordSchema, PASSWORD_RULES } from '@/lib/password'
 
 const schema = z
   .object({
-    password: z.string().min(8, 'Password must be at least 8 characters'),
+    password: passwordSchema,
     confirmPassword: z.string(),
   })
   .refine((d) => d.password === d.confirmPassword, {
@@ -61,6 +62,12 @@ export function ResetPasswordForm({ token }: { token: string }) {
           <span className="field-error">{errors.confirmPassword.message}</span>
         )}
       </div>
+
+      <ul className="password-rules">
+        {PASSWORD_RULES.map((rule) => (
+          <li key={rule}>{rule}</li>
+        ))}
+      </ul>
 
       {serverError && <ErrorMessage message={serverError} />}
 

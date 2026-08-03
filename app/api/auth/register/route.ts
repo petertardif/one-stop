@@ -3,11 +3,12 @@ import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { query } from '@/lib/db'
 import { validateInviteToken, consumeInviteToken } from '@/lib/tokens'
+import { passwordSchema } from '@/lib/password'
 
 const bodySchema = z.object({
   token: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: passwordSchema,
 })
 
 export async function POST(req: NextRequest) {

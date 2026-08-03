@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { query } from '@/lib/db'
 import { ProfileForm } from './ProfileForm'
+import { ChangePasswordForm } from './ChangePasswordForm'
 
 interface ProfileRow {
   first_name: string | null
@@ -38,6 +39,7 @@ export default async function ProfilePage({
     <main className="settings-page">
       <h1>Profile</h1>
       <ProfileForm profile={profile} requireProfile={searchParams.requireProfile === '1'} />
+      <ChangePasswordForm />
     </main>
   )
 }

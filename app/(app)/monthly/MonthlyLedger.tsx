@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, Fragment } from 'react'
-import { Pencil, Trash2, Check, X, Landmark, CreditCard, StickyNote, Banknote, SlidersHorizontal, Plus, Copy, RefreshCw, Wallet, CalendarDays, Tag, CheckCheck, ChevronDown } from 'lucide-react'
+import { Pencil, Trash2, Check, X, Landmark, CreditCard, StickyNote, Banknote, SlidersHorizontal, Plus, Copy, RefreshCw, Wallet, CalendarDays, CheckCheck, ChevronDown } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Spinner } from '@/components/Spinner'
 import { RecordModal, ModalField } from '@/components/RecordModal'
 import { Tooltip } from '@/components/Tooltip'
+import { ColumnFilter } from '@/components/ColumnFilter'
 
 
 interface Account {
@@ -166,6 +167,7 @@ function formatMoneyCents(raw: string): string {
 }
 
 type Period = 'all' | '3m' | '6m' | string // string covers 'YYYY' and 'YYYY-MM'
+type PostedFilter = 'all' | 'posted' | 'unposted'
 
 // Format a Friday week-start (YYYY-MM-DD) as "Jul 11 – Jul 17" (Fri → Thu).
 // Parse/format in UTC so the date the server computed isn't shifted by timezone.
@@ -263,14 +265,17 @@ function pageWindow(current: number, count: number): (number | 'gap')[] {
 async function fetchTransactions(
   period: Period,
   accountId: string,
-  category: string,
+  categories: string[],
+  posted: PostedFilter,
   page: number,
   pageSize: number
 ): Promise<TxPage> {
   const params = new URLSearchParams()
   if (period !== 'all') params.set('period', period)
   if (accountId !== 'all') params.set('account_id', accountId)
-  if (category !== 'all') params.set('category', category)
+  // Repeated `category` params; an empty selection means "all categories".
+  for (const c of categories) params.append('category', c)
+  if (posted !== 'all') params.set('posted', posted)
   params.set('page', String(page))
   params.set('pageSize', String(pageSize))
   params.set('tz', userTz())
@@ -290,7 +295,10 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
   // Add/edit transaction modal (replaces the old inline new/edit rows).
   const txDialogRef = useRef<HTMLDialogElement>(null)
   const [txForm, setTxForm] = useState<TxForm>(emptyTx)
-  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  // Both filters live in the table column headers. Empty array / 'all' = the default,
+  // which renders the bare column name rather than a count.
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [postedFilter, setPostedFilter] = useState<PostedFilter>('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(100)
   const [syncing, setSyncing] = useState(false)
@@ -323,8 +331,10 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
   })
 
   const { data: txPage, isLoading } = useQuery({
-    queryKey: ['transactions', period, selectedAccount, selectedCategory, page, pageSize],
-    queryFn: () => fetchTransactions(period, selectedAccount, selectedCategory, page, pageSize),
+    // Categories join into the key so React Query treats each distinct selection as its
+    // own cache entry (an array identity would change on every render).
+    queryKey: ['transactions', period, selectedAccount, selectedCategories.join(','), postedFilter, page, pageSize],
+    queryFn: () => fetchTransactions(period, selectedAccount, selectedCategories, postedFilter, page, pageSize),
     placeholderData: (prev) => prev, // keep the current page visible while the next loads
   })
   const transactions = txPage?.rows ?? []
@@ -515,12 +525,12 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
   // Changing any filter changes which rows are visible, so drop the selection.
   useEffect(() => {
     setSelectedIds(new Set())
-  }, [period, selectedAccount, selectedCategory])
+  }, [period, selectedAccount, selectedCategories, postedFilter])
 
   // Filters / page-size change the result set — jump back to page 1.
   useEffect(() => {
     setPage(1)
-  }, [period, selectedAccount, selectedCategory, pageSize])
+  }, [period, selectedAccount, selectedCategories, postedFilter, pageSize])
 
   // Keep the page in range if the total shrinks (e.g. after a bulk delete).
   useEffect(() => {
@@ -542,7 +552,7 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
       range.selectNodeContents(cell)
       cell.classList.toggle('desc-col--multiline', range.getClientRects().length >= 2)
     })
-  }, [transactions, selectedCategory, selectedAccount])
+  }, [transactions, selectedCategories, selectedAccount])
 
   // Period/category filters and pagination are applied server-side; re-sort the
   // page defensively into checkbook order (seq desc). The running `balance` is
@@ -622,14 +632,34 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
     </div>
   )
 
+  // Both filters render inside their own column header. Shared here so the mobile
+  // Filters modal can reuse the exact same controls (the headers scroll off-screen on
+  // a phone), keeping one source of truth for each filter.
   const categoryFilter = (
-    <span className="filter-chip">
-      <Tag size={14} />
-      <select aria-label="Category" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
-        <option value="all">All Categories</option>
-        {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-      </select>
-    </span>
+    <ColumnFilter
+      label="Category"
+      mode="multi"
+      allLabel="All Categories"
+      options={categories.map((c) => ({ value: c, label: c }))}
+      selected={selectedCategories}
+      onChange={setSelectedCategories}
+      summary={selectedCategories.length > 0 ? String(selectedCategories.length) : null}
+    />
+  )
+
+  const postedFilterControl = (
+    <ColumnFilter
+      label="Posted"
+      mode="single"
+      allLabel="All"
+      options={[
+        { value: 'posted', label: 'Posted' },
+        { value: 'unposted', label: 'Unposted' },
+      ]}
+      selected={postedFilter === 'all' ? [] : [postedFilter]}
+      onChange={(next) => setPostedFilter((next[0] as PostedFilter) ?? 'all')}
+      summary={postedFilter === 'all' ? null : postedFilter === 'posted' ? 'Posted' : 'Unposted'}
+    />
   )
 
   // `closeFirst` (mobile modal) dismisses the Filters modal before the action
@@ -714,9 +744,9 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
         </div>
 
         {/* Desktop: full inline controls row (hidden on mobile). */}
+        {/* Category/Posted moved into their column headers, so only Period remains here. */}
         <div className="ledger-controls ledger-controls--desktop">
           {periodSelector}
-          {categoryFilter}
           <div className="ledger-actions ledger-actions--split">{actionButtons(true)}</div>
         </div>
 
@@ -748,8 +778,8 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
                 />
               </th>
               <th>Date</th>
-              <th className="col-center">Posted</th>
-              <th>Category</th>
+              <th className="col-center">{postedFilterControl}</th>
+              <th>{categoryFilter}</th>
               <th className="desc-col">Description</th>
               <th className="amount-col col-center">Amount</th>
               <th className="amount-col col-center">Balance</th>
@@ -983,10 +1013,11 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
               <span className="ledger-filters-modal__label">Period</span>
               {periodSelector}
             </div>
-            <div className="ledger-filters-modal__field">
-              <span className="ledger-filters-modal__label">Category</span>
-              {categoryFilter}
-            </div>
+            {/* These two carry their own label + active count in the trigger, so no
+                separate __label span -- the column headers they mirror are off-screen
+                behind horizontal scroll on a phone. */}
+            <div className="ledger-filters-modal__field">{categoryFilter}</div>
+            <div className="ledger-filters-modal__field">{postedFilterControl}</div>
             <div className="ledger-actions">
               {actionButtons(false, () => filtersDialogRef.current?.close())}
             </div>

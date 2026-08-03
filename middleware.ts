@@ -24,6 +24,10 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    '/((?!login|register|forgot-password|reset-password|api/auth|_next/static|_next/image|favicon\\.ico).*)',
+    // Static assets in public/ must be excluded by extension, not by name. Listing only
+    // `favicon.ico` (which does not exist) meant real icon requests -- favicon.svg,
+    // favicon-32.png, apple-touch-icon.png, manifest.webmanifest -- were treated as app
+    // routes and 307'd to /login, so the browser got HTML where it expected an image.
+    '/((?!login|register|forgot-password|reset-password|api/auth|_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)',
   ],
 }
