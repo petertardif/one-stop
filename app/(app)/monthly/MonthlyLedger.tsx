@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Spinner } from '@/components/Spinner'
 import { RecordModal, ModalField } from '@/components/RecordModal'
 import { Tooltip } from '@/components/Tooltip'
-import { ColumnFilter } from '@/components/ColumnFilter'
+import { ColumnFilter, type ColumnFilterOption } from '@/components/ColumnFilter'
 
 
 interface Account {
@@ -601,26 +601,38 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
 
   // The three filters + action buttons are shared between the desktop inline
   // controls row and the mobile Filters modal (Sync is desktop-only).
+  // A native <select> renders its option list via the OS, which CSS cannot reach — next to
+  // the styled Category/Posted menus it looked unstyled. Same dropdown component here, so
+  // every ledger filter opens the same way; `filter-chip` keeps the pill trigger.
+  const periodOptions: ColumnFilterOption[] = [
+    { value: '6m', label: 'Last 6 Months' },
+    { value: '3m', label: 'Last 3 Months' },
+    { value: 'month', label: 'By Month' },
+    ...years.map((y) => ({ value: y, label: y })),
+  ]
+  // A YYYY-MM period is the "By Month" option; the month itself shows in the nav beside it.
+  const currentPeriodValue = isMonthPeriod ? 'month' : period
+  const currentPeriodLabel =
+    currentPeriodValue === 'all'
+      ? 'All Time'
+      : periodOptions.find((o) => o.value === currentPeriodValue)?.label ?? 'All Time'
+
   const periodSelector = (
     <div className="period-selector">
-      <span className="filter-chip">
-        <CalendarDays size={14} />
-        <select
-          aria-label="Period"
-          value={/^\d{4}-\d{2}$/.test(period) ? 'month' : period}
-          onChange={(e) => {
-            const val = e.target.value
-            if (val === 'month') setPeriod(currentMonthPeriod())
-            else setPeriod(val)
-          }}
-        >
-          <option value="all">All Time</option>
-          <option value="6m">Last 6 Months</option>
-          <option value="3m">Last 3 Months</option>
-          <option value="month">By Month</option>
-          {years.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
-      </span>
+      <ColumnFilter
+        label={currentPeriodLabel}
+        mode="single"
+        allLabel="All Time"
+        options={periodOptions}
+        selected={currentPeriodValue === 'all' ? [] : [currentPeriodValue]}
+        onChange={(next) => {
+          const val = next[0]
+          if (val === 'month') setPeriod(currentMonthPeriod())
+          else setPeriod(val ?? 'all')
+        }}
+        icon={<CalendarDays size={14} />}
+        triggerClassName="filter-chip"
+      />
 
       {isMonthPeriod && (
         <div className="month-nav">

@@ -25,6 +25,13 @@ interface Props {
   summary?: string | null
   /** Label for the option that clears the filter back to "all". */
   allLabel: string
+  /** Optional leading icon, e.g. the calendar on the Period chip. */
+  icon?: React.ReactNode
+  /**
+   * Extra class on the trigger. The ledger's Period filter passes `filter-chip` so it
+   * keeps the pill look of the controls row while sharing this menu.
+   */
+  triggerClassName?: string
 }
 
 interface Coords {
@@ -44,6 +51,8 @@ export function ColumnFilter({
   mode,
   summary,
   allLabel,
+  icon,
+  triggerClassName,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -110,11 +119,14 @@ export function ColumnFilter({
       <button
         type="button"
         ref={triggerRef}
-        className={['column-filter__trigger', isAll ? '' : 'is-active'].filter(Boolean).join(' ')}
+        className={['column-filter__trigger', triggerClassName, isAll ? '' : 'is-active']
+          .filter(Boolean)
+          .join(' ')}
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
+        {icon}
         <span>
           {label}
           {summary ? ` (${summary})` : ''}

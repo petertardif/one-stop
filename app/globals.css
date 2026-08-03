@@ -1141,8 +1141,27 @@ p, h1, h2, h3, h4, h5, h6 {
   cursor: pointer;
 }
 
-.column-filter__trigger:hover,
-.column-filter__trigger.is-active { color: var(--accent, #2563eb); }
+.column-filter__trigger:hover { color: var(--accent, #2563eb); }
+
+/* The Period chip always carries a value, so the "filtered" accent would be permanently
+   on. Limit it to the column headers, where a bare label genuinely means unfiltered. */
+.column-filter__trigger.is-active:not(.filter-chip) { color: var(--accent, #2563eb); }
+
+/* Period reuses the controls-row pill. Two classes, so this beats the base trigger's
+   reset regardless of source order. */
+.column-filter__trigger.filter-chip {
+  padding: 5px 12px;
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  background: var(--surface-primary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  text-transform: none;
+  letter-spacing: normal;
+  transition: border-color 150ms ease;
+}
+
+.column-filter__trigger.filter-chip:hover { border-color: var(--accent); }
 
 .column-filter__menu {
   position: fixed;
