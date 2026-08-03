@@ -111,6 +111,31 @@ export async function sendDeathTriggerEmail(to: string, confirmerName: string): 
   }
 }
 
+// Sent after a self-service password change. This is the main way the account holder finds
+// out if someone else changed it, so it must go out even though the change already applied.
+export async function sendPasswordChangedEmail(to: string): Promise<void> {
+  const url = `${BASE_URL}/forgot-password`
+  const info = await mailer.sendMail({
+    from: FROM,
+    to,
+    subject: 'Your One Stop password was changed',
+    text: `The password for your One Stop account was just changed.\n\nIf this was you, no action is needed.\n\nIf it wasn't, reset your password immediately:\n\n${url}`,
+    html: htmlBody(
+      [
+        'The password for your One Stop account was just changed.',
+        'If this was you, no action is needed.',
+        "If it wasn't you, reset your password immediately.",
+      ],
+      url,
+      'Reset your password'
+    ),
+  })
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('Password-changed email preview:', nodemailer.getTestMessageUrl(info))
+  }
+}
+
 export async function sendPasswordResetEmail(to: string, token: string): Promise<void> {
   const url = `${BASE_URL}/reset-password?token=${token}`
   const info = await mailer.sendMail({

@@ -30,11 +30,15 @@ beforeEach(() => jest.clearAllMocks())
 
 describe('POST /api/auth/reset-password', () => {
   it('returns 400 for missing token', async () => {
-    const res = await POST(makeRequest({ password: 'newpassword1' }))
+    const res = await POST(makeRequest({ password: 'NewPassw0rd!23' }))
     expect(res.status).toBe(400)
   })
 
-  it('returns 400 for password shorter than 8 characters', async () => {
+  it('returns 400 for a password that fails the complexity rules', async () => {
+    // long enough, but no uppercase, number, or special character
+    const weak = await POST(makeRequest({ token: 'tok', password: 'alllowercaseonly' }))
+    expect(weak.status).toBe(400)
+
     const res = await POST(makeRequest({ token: 'tok', password: 'short' }))
     expect(res.status).toBe(400)
   })
@@ -42,7 +46,7 @@ describe('POST /api/auth/reset-password', () => {
   it('returns 400 for invalid or expired token', async () => {
     mockValidate.mockResolvedValueOnce(null)
 
-    const res = await POST(makeRequest({ token: 'expired', password: 'newpassword1' }))
+    const res = await POST(makeRequest({ token: 'expired', password: 'NewPassw0rd!23' }))
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/invalid or expired/i)
@@ -54,10 +58,10 @@ describe('POST /api/auth/reset-password', () => {
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
     mockConsume.mockResolvedValueOnce(undefined)
 
-    const res = await POST(makeRequest({ token: 'tok', password: 'newpassword1' }))
+    const res = await POST(makeRequest({ token: 'tok', password: 'NewPassw0rd!23' }))
 
     expect(res.status).toBe(200)
-    expect(mockHash).toHaveBeenCalledWith('newpassword1', 12)
+    expect(mockHash).toHaveBeenCalledWith('NewPassw0rd!23', 12)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE users'),
       ['new-hash', 'user-1']
@@ -68,7 +72,7 @@ describe('POST /api/auth/reset-password', () => {
   it('does not update password if token is already used', async () => {
     mockValidate.mockResolvedValueOnce(null) // used token returns null
 
-    const res = await POST(makeRequest({ token: 'used-tok', password: 'newpassword1' }))
+    const res = await POST(makeRequest({ token: 'used-tok', password: 'NewPassw0rd!23' }))
 
     expect(res.status).toBe(400)
     expect(mockQuery).not.toHaveBeenCalled()

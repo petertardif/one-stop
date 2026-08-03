@@ -8,6 +8,16 @@ export const metadata: Metadata = {
   title: 'One Stop',
   description: 'A private, family-focused financial hub.',
   manifest: '/manifest.webmanifest',
+  // The icons live in public/ but nothing referenced them, so Next emitted no <link rel="icon">
+  // and browsers fell back to a non-existent /favicon.ico. Declare them explicitly.
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon-32.png', type: 'image/png', sizes: '32x32' },
+      { url: '/favicon-16.png', type: 'image/png', sizes: '16x16' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
+  },
 }
 
 export const viewport: Viewport = {
