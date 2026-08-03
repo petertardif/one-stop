@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { query } from '@/lib/db'
 import { Sidebar } from '@/components/Sidebar'
 import { Topbar } from '@/components/Topbar'
+import { AuthRedirectRelease } from '@/components/AuthRedirectRelease'
 
 interface ProfileRow {
   first_name: string | null
@@ -27,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="app-shell">
+      <AuthRedirectRelease />
       <Sidebar role={session.user.role} />
       <div className="app-shell__main">
         <Topbar

@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useRouter } from 'next/navigation'
 import { ErrorMessage } from '@/components/ErrorMessage'
+import { useBusyWhile } from '@/components/BusyOverlay'
 import { passwordSchema, PASSWORD_RULES } from '@/lib/password'
 
 const schema = z
@@ -29,6 +30,8 @@ export function ResetPasswordForm({ token }: { token: string }) {
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
+
+  useBusyWhile(isSubmitting)
 
   async function onSubmit(values: FormValues) {
     setServerError(null)

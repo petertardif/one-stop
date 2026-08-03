@@ -1,6 +1,7 @@
 'use client'
 
 import { signOut } from 'next-auth/react'
+import { useBusyHold } from '@/components/BusyOverlay'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { LogOut, Settings, Camera, Menu } from 'lucide-react'
@@ -19,6 +20,7 @@ export function Topbar({ firstName, email, avatarUrl: initialAvatarUrl }: Topbar
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const { hold } = useBusyHold()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const initials = firstName.slice(0, 1).toUpperCase()
@@ -97,7 +99,14 @@ export function Topbar({ firstName, email, avatarUrl: initialAvatarUrl }: Topbar
             </Link>
             <button
               className="topbar__dropdown-item"
-              onClick={() => signOut({ callbackUrl: '/login' })}
+              // A hold, not useBusyWhile: signOut() navigates away and unmounts this
+              // component, which would drop the spinner mid-redirect. Nothing releases
+              // this one -- signOut does a full page load, tearing down the provider and
+              // its holds with it. The hold timeout is only a backstop if that fails.
+              onClick={() => {
+                hold('sign-out')
+                signOut({ callbackUrl: '/login' })
+              }}
             >
               <LogOut size={14} />
               Sign out

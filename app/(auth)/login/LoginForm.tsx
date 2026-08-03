@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { ErrorMessage } from '@/components/ErrorMessage'
+import { useBusyWhile, useBusyHold, AUTH_REDIRECT_HOLD } from '@/components/BusyOverlay'
 
 const schema = z.object({
   email: z.string().email('Invalid email address'),
@@ -24,12 +25,16 @@ const ERROR_MESSAGES: Record<string, string> = {
 export function LoginForm({ next }: { next?: string }) {
   const router = useRouter()
   const [authError, setAuthError] = useState<string | null>(null)
+  const { hold } = useBusyHold()
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
+
+  // Covers the credential check itself; the hold below covers the redirect that follows.
+  useBusyWhile(isSubmitting)
 
   async function onSubmit(values: FormValues) {
     setAuthError(null)
@@ -56,6 +61,10 @@ export function LoginForm({ next }: { next?: string }) {
       return
     }
 
+    // A hold rather than useBusyWhile: this component unmounts on redirect, which would
+    // release the spinner and leave a blank gap while the destination loads. The
+    // destination clears it via AUTH_REDIRECT_HOLD once its own data is ready.
+    hold(AUTH_REDIRECT_HOLD)
     router.push(next ?? '/dashboard')
   }
 

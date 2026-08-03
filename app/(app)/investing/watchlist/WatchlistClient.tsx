@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Trash2 } from 'lucide-react'
 import { StatusBadge } from '@/components/investing/StatusBadge'
 import { Tooltip } from '@/components/Tooltip'
+import { useBusyWhile } from '@/components/BusyOverlay'
 
 export interface WatchlistRow {
   id: string
@@ -44,6 +45,10 @@ export function WatchlistClient({ initialRows, isAdmin }: { initialRows: Watchli
   const queryClient = useQueryClient()
   const [rows, setRows] = useState(initialRows)
   const [deleting, setDeleting] = useState<string | null>(null)
+
+  // Deletes here use a raw fetch rather than a React Query mutation, so useIsMutating
+  // never sees them and the overlay would not appear on its own.
+  useBusyWhile(deleting !== null)
 
   async function handleDelete(ticker: string) {
     if (!confirm(`Remove ${ticker} from your watchlist?`)) return
