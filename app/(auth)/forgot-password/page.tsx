@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { useBusyWhile } from '@/components/BusyOverlay'
 
 const schema = z.object({
   email: z.string().email('Invalid email address'),
@@ -19,6 +20,8 @@ export default function ForgotPasswordPage() {
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
+
+  useBusyWhile(isSubmitting)
 
   async function onSubmit(values: FormValues) {
     await fetch('/api/auth/forgot-password', {

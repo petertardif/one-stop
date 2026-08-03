@@ -8,8 +8,8 @@ export const metadata: Metadata = {
   title: 'One Stop',
   description: 'A private, family-focused financial hub.',
   manifest: '/manifest.webmanifest',
-  // The icons live in public/ but nothing referenced them, so Next emitted no <link rel="icon">
-  // and browsers fell back to a non-existent /favicon.ico. Declare them explicitly.
+  // Declared here rather than as hand-written <link> tags in <head>, so Next owns the
+  // markup and the two cannot drift apart or be emitted twice.
   icons: {
     icon: [
       { url: '/favicon.svg', type: 'image/svg+xml' },
@@ -41,10 +41,6 @@ export default async function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
           rel="stylesheet"
         />
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="icon" href="/favicon-32.png" sizes="32x32" />
-        <link rel="icon" href="/favicon-16.png" sizes="16x16" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body>
         <Providers session={session}>{children}</Providers>

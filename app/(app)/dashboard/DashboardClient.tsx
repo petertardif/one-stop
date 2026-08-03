@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart,
@@ -16,6 +17,7 @@ import {
 import Link from 'next/link'
 import { CalendarClock, Receipt, Repeat, Car } from 'lucide-react'
 import { Spinner } from '@/components/Spinner'
+import { useBusyHold, AUTH_REDIRECT_HOLD } from '@/components/BusyOverlay'
 
 interface NetWorthPoint {
   date: string
@@ -55,6 +57,13 @@ export function DashboardClient({ firstName }: { firstName: string }) {
       return res.json()
     },
   })
+
+  // Sign-in keeps the overlay up across the redirect; this is the "dashboard is ready"
+  // signal that clears it, so there is no blank gap between login and first paint.
+  const { releaseHold } = useBusyHold()
+  useEffect(() => {
+    if (!isLoading) releaseHold(AUTH_REDIRECT_HOLD)
+  }, [isLoading, releaseHold])
 
   if (isLoading || !data) return <Spinner />
 
