@@ -1165,11 +1165,14 @@ p, h1, h2, h3, h4, h5, h6 {
 
 .column-filter__menu {
   position: fixed;
-  z-index: 3100;
+  /* Top of the stack: an open dropdown should never be painted over. Inside the mobile
+     Filters modal it is portalled into the <dialog>, so it rides that top layer too.
+     max-height is set inline from the measured space, so it is deliberately absent here. */
+  z-index: 9999;
   min-width: 180px;
-  max-width: min(320px, 90vw);
-  max-height: 280px;
+  max-width: min(320px, calc(100vw - 16px));
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 4px;
   background: var(--surface-primary);
   border: 1px solid var(--surface-border);
@@ -3688,6 +3691,19 @@ p, h1, h2, h3, h4, h5, h6 {
 .ledger-filters-modal__field .period-selector,
 .ledger-filters-modal__field .account-tabs { flex-wrap: wrap; }
 .ledger-filters-modal__field select { width: 100%; }
+
+/* In the narrow Filters modal the leading lucide icon pushed labels past the button edge.
+   Drop only that first icon — a trailing chevron is not :first-child, so dropdown buttons
+   (Mark as…, Add, and the filter triggers) keep the affordance that says they open a menu.
+   Desktop toolbar buttons and the column headers are untouched. */
+.ledger-filters-modal button > svg:first-child { display: none; }
+
+/* Let labels use the reclaimed width instead of overflowing. */
+.ledger-filters-modal .ledger-actions { flex-wrap: wrap; }
+.ledger-filters-modal .ledger-actions button { flex: 1 1 auto; justify-content: center; min-width: 0; }
+.ledger-filters-modal .column-filter,
+.ledger-filters-modal .column-filter__trigger { width: 100%; }
+.ledger-filters-modal .column-filter__trigger { justify-content: space-between; }
 
 @media (max-width: 768px) {
   .ledger-controls--desktop { display: none; }
