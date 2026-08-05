@@ -3685,6 +3685,15 @@ p, h1, h2, h3, h4, h5, h6 {
 }
 .ledger-filters-btn:hover { background: var(--surface-secondary); }
 
+/* Fixed ~400px box rather than .modal's `height: fit-content`, so the modal stays a
+   predictable size and leaves room for the column dropdowns to flip and hang outside it.
+   Two classes, so this beats `.modal` regardless of source order. The dvh cap keeps it on
+   screen on short viewports, where .modal's own overflow-y scrolls the overflow. */
+.modal.ledger-filters-modal {
+  height: 400px;
+  max-height: calc(100dvh - 32px);
+}
+
 .ledger-filters-modal__body { display: flex; flex-direction: column; gap: var(--spacing-md); }
 .ledger-filters-modal__field { display: flex; flex-direction: column; gap: 6px; }
 .ledger-filters-modal__label { font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); }
