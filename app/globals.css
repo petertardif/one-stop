@@ -60,6 +60,9 @@ p, h1, h2, h3, h4, h5, h6 {
   --surface-app: #FDFBF6;
   --surface-primary: #ffffff;
   --surface-secondary: #F7F2E9;
+  /* Same colour as --surface-secondary at 50% alpha. Layered over the background texture
+     to hold it at ~50% strength; keep the RGB in sync if --surface-secondary changes. */
+  --surface-secondary-wash: rgba(247, 242, 233, 0.5);
   --surface-sunken: #EDE5D4;
   --surface-border: rgba(46, 41, 33, 0.14);
 
@@ -406,7 +409,23 @@ p, h1, h2, h3, h4, h5, h6 {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+
+  /* Decorative background texture, on every authenticated screen.
+     It lives here rather than on .app-shell__content for two reasons: this element is the
+     scroll container, so its background is painted against the border box and stays put
+     while content scrolls over it; and being `flex: 1` beside the sidebar, it already
+     spans exactly the content column whether the sidebar is expanded or collapsed.
+     Opacity cannot be applied to a background image, so a wash of the page surface sits on
+     top, holding the texture at roughly 50%. */
+  background-color: var(--surface-secondary);
+  background-image:
+    linear-gradient(var(--surface-secondary-wash), var(--surface-secondary-wash)),
+    url('/image-from-rawpixel-id-6242220-png.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
+
 
 /* Top bar */
 
@@ -509,7 +528,10 @@ p, h1, h2, h3, h4, h5, h6 {
 .app-shell__content {
   flex: 1;
   padding: var(--spacing-lg);
-  background: var(--surface-secondary);
+  /* Transparent, not --surface-secondary: this element grows with its content, so a
+     background here would scroll and would also hide the texture painted on
+     .app-shell__main. The surface colour now comes from that parent instead. */
+  background: transparent;
 }
 
 /* === AUTH PAGES === */
@@ -2649,14 +2671,18 @@ p, h1, h2, h3, h4, h5, h6 {
   position: sticky;
   top: var(--header-height);
   z-index: 20;
-  background: var(--surface-secondary);
+  /* Deliberately transparent: the page texture should run unbroken behind the buttons.
+     Do not restore a fill here -- that is what made the toolbar read as a flat band.
+     Note this is the toolbar only; the sticky table header (.ledger-table th) keeps its
+     own opaque --surface-primary so rows stay masked as they scroll under it. */
+  background: transparent;
   padding: var(--spacing-sm) 0;
 }
 .ledger-controls-mobile {
   position: sticky;
   top: var(--header-height);
   z-index: 20;
-  background: var(--surface-secondary);
+  background: transparent;
 }
 
 /* When the controls row sits directly above the table (Investments page),
