@@ -59,8 +59,11 @@ const EMPTY_FORM: FormState = {
   milestone_label: '', images: [],
 }
 
+export type MessagesTab = 'confirm' | 'messages'
+
 interface Props {
   isAuthor: boolean
+  initialTab: MessagesTab
   parents: Parent[]
   diedAt: string | null
   deliveredName: string
@@ -68,15 +71,44 @@ interface Props {
   recipients: Recipient[]
 }
 
-export function MessagesClient({ isAuthor, parents, diedAt, deliveredName, waitingCount, recipients }: Props) {
+export function MessagesClient({ isAuthor, initialTab, parents, diedAt, deliveredName, waitingCount, recipients }: Props) {
   if (isAuthor) {
-    return <AuthorView parents={parents} diedAt={diedAt} deliveredName={deliveredName} recipients={recipients} />
+    return (
+      <AuthorView
+        initialTab={initialTab}
+        parents={parents}
+        diedAt={diedAt}
+        deliveredName={deliveredName}
+        recipients={recipients}
+      />
+    )
   }
   return <RecipientView parents={parents} diedAt={diedAt} deliveredName={deliveredName} waitingCount={waitingCount} />
 }
 
+// Shared so the card (recipients) and the page lead (authors) can never drift apart.
+const GATE_LEAD = 'When a parent passes away there will be individual messages left here for you.'
+
+// died_at is a timestamptz; show the date only -- the exact minute adds nothing here.
+function formatConfirmedAt(diedAt: string): string {
+  const d = new Date(diedAt)
+  return Number.isNaN(d.getTime())
+    ? diedAt
+    : d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+}
+
 // ── The death gate: parent-neutral Yes/No + a who-died picker + type-to-confirm ──
-function DeathGate({ parents, redirectOnCancel }: { parents: Parent[]; redirectOnCancel?: boolean }) {
+function DeathGate({
+  parents,
+  redirectOnCancel,
+  // Authors render this copy above the card as the page lead, so the card omits it there.
+  // Recipients keep it inside the card, which is their whole view.
+  showLead = true,
+}: {
+  parents: Parent[]
+  redirectOnCancel?: boolean
+  showLead?: boolean
+}) {
   const router = useRouter()
   const confirmRef = useRef<HTMLDialogElement>(null)
   const [saidNo, setSaidNo] = useState(false)
@@ -121,9 +153,7 @@ function DeathGate({ parents, redirectOnCancel }: { parents: Parent[]; redirectO
 
   return (
     <div className="goodbyes-gate">
-      <p className="goodbyes-gate__lead">
-        When a parent passes away there will be individual messages left here for you.
-      </p>
+      {showLead && <p className="goodbyes-gate__lead">{GATE_LEAD}</p>}
       <h2 className="goodbyes-gate__question">Has a parent passed away?</h2>
       <div className="goodbyes-gate__buttons">
         <button className="goodbyes-gate__btn goodbyes-gate__btn--yes" onClick={openConfirm}>Yes</button>
@@ -172,11 +202,23 @@ function DeathGate({ parents, redirectOnCancel }: { parents: Parent[]; redirectO
 }
 
 // ── Author view: manage the shared set of messages (admin + partner_admin) ──
-function AuthorView({ parents, diedAt, deliveredName, recipients }: { parents: Parent[]; diedAt: string | null; deliveredName: string; recipients: Recipient[] }) {
+function AuthorView({ initialTab, parents, diedAt, deliveredName, recipients }: { initialTab: MessagesTab; parents: Parent[]; diedAt: string | null; deliveredName: string; recipients: Recipient[] }) {
   const router = useRouter()
   const qc = useQueryClient()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [tab, setTab] = useState<MessagesTab>(initialTab)
+
+  // Mirror the tab into the URL so refresh and browser-back both restore it. push (not
+  // replace) is what creates the history entry that makes back work; the bare path for
+  // Confirm keeps the sidebar link's own URL canonical.
+  const changeTab = (next: MessagesTab) => {
+    setTab(next)
+    router.push(
+      next === 'messages' ? '/contingency/messages?tab=messages' : '/contingency/messages',
+      { scroll: false }
+    )
+  }
 
   const recipientName = (r: Recipient) => (r.first_name?.trim() || r.role)
   const audienceLabel = (m: GoodbyeMessage) => {
@@ -285,20 +327,24 @@ function AuthorView({ parents, diedAt, deliveredName, recipients }: { parents: P
   const showMedia = form.kind === 'main' || form.kind === 'video' || form.kind === 'audio'
 
   return (
-    <div className="goodbyes">
+    <div className="goodbyes goodbyes--wide">
       <div className="goodbyes-manage__header">
         <div>
-          <h1>Messages</h1>
+          <h1>{tab === 'confirm' ? 'Confirmation' : 'Messages'}</h1>
         </div>
         <div className="ledger-actions">
-          <button className="primary" onClick={openNew}><Plus size={14} /> New message</button>
-          {diedAt && (
+          {tab === 'messages' && (
+            <button className="primary" onClick={openNew}><Plus size={14} /> New message</button>
+          )}
+          {tab === 'confirm' && diedAt && (
             <button className="danger" onClick={resetDeath}><RotateCcw size={14} /> Reset death status</button>
           )}
         </div>
       </div>
 
-      {diedAt ? (
+      {tab === 'confirm' ? (
+        <p className="goodbyes-lead">{GATE_LEAD}</p>
+      ) : diedAt ? (
         <p className="goodbyes-lead">
           The death gate has been confirmed for {deliveredName} — these messages are now being delivered.
           Video/audio/photos are links you paste (e.g. an unlisted YouTube/Vimeo/Drive URL).
@@ -310,42 +356,59 @@ function AuthorView({ parents, diedAt, deliveredName, recipients }: { parents: P
         </p>
       )}
 
-      {isLoading && <Spinner />}
+      <div className="account-tabs goodbyes-tabs">
+        <button className={tab === 'confirm' ? 'active' : ''} onClick={() => changeTab('confirm')}>Confirm</button>
+        <button className={tab === 'messages' ? 'active' : ''} onClick={() => changeTab('messages')}>Messages</button>
+      </div>
 
-      {!isLoading && messages.length === 0 && (
-        <p className="dashboard__empty">No messages yet. Add the first one.</p>
+      {tab === 'confirm' && (
+        diedAt ? (
+          <div className="goodbyes-confirmed">
+            <p className="goodbyes-confirmed__title">Confirmed for {deliveredName}</p>
+            <p className="goodbyes-confirmed__note">
+              Recorded {formatConfirmedAt(diedAt)}. Messages authored by {deliveredName} are now being
+              delivered. Use Reset death status above to return everyone to the question.
+            </p>
+          </div>
+        ) : (
+          <DeathGate parents={parents} showLead={false} />
+        )
       )}
 
-      {!isLoading && messages.length > 0 && (
-        <div className="ledger-table-wrap">
-          <table className="ledger-table">
-            <thead>
-              <tr>
-                <th>For</th><th>Type</th><th>Title</th><th>Release</th><th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {messages.map((m) => (
-                <tr key={m.id}>
-                  <td>{audienceLabel(m)}</td>
-                  <td>{KIND_LABEL[m.kind]}</td>
-                  <td>{m.title || <span className="text-muted">—</span>}</td>
-                  <td>{releaseLabel(m)}</td>
-                  <td className="col-center">
-                    <button className="icon-btn icon-btn--edit" onClick={() => openEdit(m)} aria-label="Edit"><Pencil size={16} /></button>
-                    <button className="icon-btn icon-btn--delete" onClick={() => { if (confirm('Delete this message?')) deleteMutation.mutate(m.id) }} aria-label="Delete"><Trash2 size={16} /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {tab === 'messages' && (
+        <>
+          {isLoading && <Spinner />}
 
-      {!diedAt && (
-        <div className="goodbyes-gate-section">
-          <DeathGate parents={parents} />
-        </div>
+          {!isLoading && messages.length === 0 && (
+            <p className="dashboard__empty">No messages yet. Add the first one.</p>
+          )}
+
+          {!isLoading && messages.length > 0 && (
+            <div className="ledger-table-wrap">
+              <table className="ledger-table">
+                <thead>
+                  <tr>
+                    <th>For</th><th>Type</th><th>Title</th><th>Release</th><th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {messages.map((m) => (
+                    <tr key={m.id}>
+                      <td>{audienceLabel(m)}</td>
+                      <td>{KIND_LABEL[m.kind]}</td>
+                      <td>{m.title || <span className="text-muted">—</span>}</td>
+                      <td>{releaseLabel(m)}</td>
+                      <td className="col-center">
+                        <button className="icon-btn icon-btn--edit" onClick={() => openEdit(m)} aria-label="Edit"><Pencil size={16} /></button>
+                        <button className="icon-btn icon-btn--delete" onClick={() => { if (confirm('Delete this message?')) deleteMutation.mutate(m.id) }} aria-label="Delete"><Trash2 size={16} /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
 
       <RecordModal

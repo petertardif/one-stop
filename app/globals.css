@@ -504,13 +504,13 @@ p, h1, h2, h3, h4, h5, h6 {
   display: none;
 }
 
+/* A normal flex item, not absolutely positioned at the right edge -- that only avoided the
+   avatar while the avatar was on the left. It now flows before the right-aligned user
+   block, so the two can never overlap. */
 .topbar__upload-error {
   font-size: var(--font-size-sm);
   color: #e53e3e;
-  position: absolute;
-  right: var(--spacing-lg);
-  top: 50%;
-  transform: translateY(-50%);
+  min-width: 0;
 }
 
 .topbar__name {
@@ -2057,6 +2057,11 @@ p, h1, h2, h3, h4, h5, h6 {
 
 .topbar__user {
   position: relative;
+  /* Pin right in both layouts. `justify-content: space-between` alone cannot: on desktop
+     the hamburger is display:none and the file input is too, leaving this as the only flex
+     item -- and a lone item under space-between sits at flex-start, i.e. far left. An auto
+     margin absorbs the free space whether or not the hamburger is present. */
+  margin-left: auto;
 }
 
 .topbar__dropdown {
@@ -2989,6 +2994,28 @@ p, h1, h2, h3, h4, h5, h6 {
 
 /* === IN CASE I DIE — GOODBYES === */
 .goodbyes { max-width: 760px; }
+
+/* Author view only. The recipient view shares the .goodbyes wrapper and must keep the
+   760px reading column, so the width change is a modifier rather than an edit above. */
+.goodbyes--wide { max-width: none; }
+
+/* The message table wants the full width, but the gate is a short centred card -- left
+   unbounded its Yes/No buttons end up stranded at opposite ends of a wide monitor. */
+.goodbyes--wide .goodbyes-gate { max-width: 760px; }
+
+/* More breathing room than .debts-tabs: the content directly below is a bordered
+   card (Confirm) or a table (Messages), so the shared 24px reads as cramped. */
+.goodbyes-tabs { margin-bottom: var(--spacing-xl); }
+
+.goodbyes-confirmed {
+  padding: var(--spacing-lg);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-primary);
+  max-width: 760px;
+}
+.goodbyes-confirmed__title { font-weight: 600; margin-bottom: var(--spacing-xs); }
+.goodbyes-confirmed__note { color: var(--text-secondary); line-height: 1.6; }
 .goodbyes h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: var(--spacing-md); }
 .goodbyes-lead { color: var(--text-secondary); line-height: 1.6; margin-bottom: var(--spacing-lg); }
 
@@ -2998,8 +3025,7 @@ p, h1, h2, h3, h4, h5, h6 {
 .goodbyes-reset { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #dc2626; background: none; color: #dc2626; border-radius: var(--radius-sm); padding: 7px var(--spacing-sm); cursor: pointer; }
 .goodbyes-reset:hover { background: rgba(220, 38, 38, 0.08); }
 
-/* Death gate — in the author view it sits below the message table with a gap. */
-.goodbyes-gate-section { margin-top: var(--spacing-2xl); }
+/* Death gate — the whole of the recipient view, and the Confirm tab for authors. */
 .goodbyes-gate {
   text-align: center;
   padding: var(--spacing-2xl) var(--spacing-lg);

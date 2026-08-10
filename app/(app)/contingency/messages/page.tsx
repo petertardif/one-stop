@@ -16,9 +16,18 @@ export interface Parent {
   name: string
 }
 
-export default async function MessagesPage() {
+// Reading ?tab here rather than with useSearchParams keeps the client component out of a
+// Suspense boundary. Anything other than 'messages' -- including no param at all, which is
+// what the sidebar link produces -- resolves to the Confirm tab.
+export default async function MessagesPage({
+  searchParams,
+}: {
+  searchParams: { tab?: string }
+}) {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
+
+  const initialTab = searchParams.tab === 'messages' ? 'messages' : 'confirm'
 
   const role = session.user.role
   const isAuthor = role === 'admin' || role === 'partner_admin'
@@ -75,6 +84,7 @@ export default async function MessagesPage() {
   return (
     <MessagesClient
       isAuthor={isAuthor}
+      initialTab={initialTab}
       parents={parents}
       diedAt={diedAt}
       deliveredName={deliveredName}
