@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, Fragment } from 'react'
-import { Pencil, Trash2, Check, X, Landmark, CreditCard, StickyNote, Banknote, SlidersHorizontal, Plus, Copy, RefreshCw, Wallet, CalendarDays, CheckCheck, ChevronDown } from 'lucide-react'
+import { Pencil, Trash2, Check, X, Landmark, CreditCard, StickyNote, Banknote, SlidersHorizontal, Plus, Copy, RefreshCw, Wallet, CalendarDays, CheckCheck, ChevronDown, FilterX } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Spinner } from '@/components/Spinner'
 import { RecordModal, ModalField } from '@/components/RecordModal'
@@ -166,6 +166,19 @@ function formatMoneyCents(raw: string): string {
   return (parseInt(digits, 10) / 100).toFixed(2)
 }
 
+// Display money as $1,234.56 / -$1,234.56 (sign leads the currency symbol).
+function money(n: number): string {
+  const abs = Math.abs(n).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  return `${n < 0 ? '-' : ''}$${abs}`
+}
+
+// What the ledger remembers about a checked row. Selection outlives the page the row
+// was checked on, so the amount is cached here rather than looked up in `transactions`.
+type SelectedRow = { amount: number; isManual: boolean }
+
 type Period = 'all' | '3m' | '6m' | string // string covers 'YYYY' and 'YYYY-MM'
 type PostedFilter = 'all' | 'posted' | 'unposted'
 
@@ -302,7 +315,11 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(100)
   const [syncing, setSyncing] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  // Selection survives paging and filter changes, so a selected row is often not on
+  // the current page — cache each row's amount at check time (the fetched
+  // `transactions` only ever holds the visible page) along with whether it is manual,
+  // which is what the bulk actions are allowed to touch.
+  const [selected, setSelected] = useState<Map<string, SelectedRow>>(new Map())
   const tableRef = useRef<HTMLTableElement>(null)
   const deleteDialogRef = useRef<HTMLDialogElement>(null)
   const filtersDialogRef = useRef<HTMLDialogElement>(null)
@@ -432,10 +449,10 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
       })
       if (!res.ok) throw new Error('Failed to delete transactions')
     },
-    onSuccess: () => {
+    onSuccess: (_data, ids) => {
       qc.invalidateQueries({ queryKey: ['transactions'] })
       qc.invalidateQueries({ queryKey: ['weekly-budget'] })
-      setSelectedIds(new Set())
+      deselect(ids)
     },
   })
 
@@ -448,10 +465,10 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
       })
       if (!res.ok) throw new Error('Failed to duplicate transactions')
     },
-    onSuccess: () => {
+    onSuccess: (_data, ids) => {
       qc.invalidateQueries({ queryKey: ['transactions'] })
       qc.invalidateQueries({ queryKey: ['weekly-budget'] })
-      setSelectedIds(new Set())
+      deselect(ids)
     },
   })
 
@@ -464,18 +481,27 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
       })
       if (!res.ok) throw new Error('Failed to update transactions')
     },
-    onSuccess: () => {
+    onSuccess: (_data, { ids }) => {
       qc.invalidateQueries({ queryKey: ['transactions'] })
       qc.invalidateQueries({ queryKey: ['weekly-budget'] })
-      setSelectedIds(new Set())
+      deselect(ids)
     },
   })
 
-  const toggleSelect = (id: string) =>
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+  const toggleSelect = (tx: Transaction) =>
+    setSelected((prev) => {
+      const next = new Map(prev)
+      if (next.has(tx.id)) next.delete(tx.id)
+      else next.set(tx.id, { amount: parseFloat(tx.amount), isManual: tx.is_manual })
+      return next
+    })
+
+  // Drop the rows a bulk action just handled, leaving the rest of the selection (and
+  // so the Checkboxes Total) intact — imported rows the server skipped stay checked.
+  const deselect = (ids: string[]) =>
+    setSelected((prev) => {
+      const next = new Map(prev)
+      for (const id of ids) next.delete(id)
       return next
     })
 
@@ -522,10 +548,29 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
   const canSaveTx =
     parseFloat(txForm.amount) > 0 && txForm.category.trim() !== '' && txForm.description.trim() !== ''
 
-  // Changing any filter changes which rows are visible, so drop the selection.
+  // The selection deliberately outlives filter and page changes (the Checkboxes Total
+  // card is meant to accumulate across views), so nothing clears it here — only the
+  // card's Clear button, the header checkbox, and completed bulk actions do.
+  //
+  // A cached amount goes stale if the row is edited, so re-sync every selected row
+  // that is on the current page whenever the page data changes.
   useEffect(() => {
-    setSelectedIds(new Set())
-  }, [period, selectedAccount, selectedCategories, postedFilter])
+    setSelected((prev) => {
+      if (prev.size === 0) return prev
+      let changed = false
+      const next = new Map(prev)
+      for (const tx of transactions) {
+        const cur = next.get(tx.id)
+        if (!cur) continue
+        const amount = parseFloat(tx.amount)
+        if (cur.amount !== amount || cur.isManual !== tx.is_manual) {
+          next.set(tx.id, { amount, isManual: tx.is_manual })
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [transactions])
 
   // Filters / page-size change the result set — jump back to page 1.
   useEffect(() => {
@@ -570,10 +615,16 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
   const weeklyBalanceOf = (tx: Transaction): number | null =>
     tx.weekly_balance != null ? parseFloat(tx.weekly_balance) : null
 
-  // Only manual rows are selectable (Plaid rows are protected from bulk delete).
-  const selectableIds = sortedTx.filter((tx) => tx.is_manual).map((tx) => tx.id)
-  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id))
-  const someSelected = selectableIds.some((id) => selectedIds.has(id))
+  // Every row is selectable, imported ones included, so any set of amounts can be
+  // totaled. Bulk actions still only touch the manual subset (enforced server-side too).
+  const selectableIds = sortedTx.map((tx) => tx.id)
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id))
+  const someSelected = selectableIds.some((id) => selected.has(id))
+
+  const manualSelectedIds = Array.from(selected)
+    .filter(([, row]) => row.isManual)
+    .map(([id]) => id)
+  const skippedCount = selected.size - manualSelectedIds.length
 
   // Header check-all: indeterminate when only some visible rows are selected.
   useEffect(() => {
@@ -582,8 +633,24 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
     }
   }, [someSelected, allSelected])
 
+  // Adds/removes the visible page only — off-page selections are left alone, since
+  // the header box speaks for this page. The card's Clear is the global reset.
   const toggleSelectAll = (checked: boolean) =>
-    setSelectedIds(checked ? new Set(selectableIds) : new Set())
+    setSelected((prev) => {
+      const next = new Map(prev)
+      for (const tx of sortedTx) {
+        if (checked) next.set(tx.id, { amount: parseFloat(tx.amount), isManual: tx.is_manual })
+        else next.delete(tx.id)
+      }
+      return next
+    })
+
+  // Sum in whole cents so a set that nets out reads as an exact 0.00 (and black).
+  const checkboxesTotal =
+    Array.from(selected.values()).reduce((sum, row) => sum + Math.round(row.amount * 100), 0) / 100
+  const totalTone = checkboxesTotal > 0 ? 'positive' : checkboxesTotal < 0 ? 'negative' : ''
+
+  const filtersActive = selectedCategories.length > 0 || postedFilter !== 'all'
 
   async function handleSync() {
     setSyncing(true)
@@ -688,19 +755,26 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
           )}
         </div>
         <div className="ledger-actions__group">
+          {/* Only the column filters are resettable here — Period always holds a value,
+              so including it would leave the button permanently on screen. */}
+          {filtersActive && (
+            <button onClick={run(() => { setSelectedCategories([]); setPostedFilter('all') })}>
+              <FilterX size={14} /> Clear Filters
+            </button>
+          )}
           <MarkAsMenu
-            disabled={selectedIds.size === 0}
-            onPick={(field, value) => { closeFirst?.(); markAsMutation.mutate({ ids: Array.from(selectedIds), field, value }) }}
+            disabled={manualSelectedIds.length === 0}
+            onPick={(field, value) => { closeFirst?.(); markAsMutation.mutate({ ids: manualSelectedIds, field, value }) }}
           />
           <button
-            onClick={run(() => bulkDuplicateMutation.mutate(Array.from(selectedIds)))}
-            disabled={selectedIds.size === 0 || bulkDuplicateMutation.isPending}
+            onClick={run(() => bulkDuplicateMutation.mutate(manualSelectedIds))}
+            disabled={manualSelectedIds.length === 0 || bulkDuplicateMutation.isPending}
           >
             <Copy size={14} /> Duplicate
           </button>
           <button
             onClick={run(() => deleteDialogRef.current?.showModal())}
-            disabled={selectedIds.size === 0}
+            disabled={manualSelectedIds.length === 0}
           >
             <Trash2 size={14} /> Delete
           </button>
@@ -753,6 +827,27 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
               <span className="weekly-budget-card__amount-label">spent</span>
             </div>
           </div>
+
+          {/* Running total of every checked row, across pages and filters. Only
+              rendered while something is selected. */}
+          {selected.size > 0 && (
+            <div className="weekly-budget-card weekly-budget-card--checkbox-total">
+              <div className="weekly-budget-card__info">
+                <span className="weekly-budget-card__label">Checkboxes Total</span>
+                <button
+                  type="button"
+                  className="weekly-budget-card__clear"
+                  onClick={() => setSelected(new Map())}
+                >
+                  {selected.size} selected — Clear
+                </button>
+              </div>
+              <div className={`weekly-budget-card__amount ${totalTone}`}>
+                {money(checkboxesTotal)}
+                <span className="weekly-budget-card__amount-label">total</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Desktop: full inline controls row (hidden on mobile). */}
@@ -811,9 +906,8 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
                   <td className="col-center">
                     <input
                       type="checkbox"
-                      disabled={!tx.is_manual}
-                      checked={selectedIds.has(tx.id)}
-                      onChange={() => toggleSelect(tx.id)}
+                      checked={selected.has(tx.id)}
+                      onChange={() => toggleSelect(tx)}
                     />
                   </td>
                   <td>{tx.date.slice(0, 10)}</td>
@@ -992,15 +1086,22 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
 
       <dialog ref={deleteDialogRef} className="confirm-dialog">
         <p>
-          You are about to delete {selectedIds.size} transaction
-          {selectedIds.size === 1 ? '' : 's'}. Do you want to proceed?
+          You are about to delete {manualSelectedIds.length} transaction
+          {manualSelectedIds.length === 1 ? '' : 's'}. Do you want to proceed?
+          {skippedCount > 0 && (
+            <>
+              {' '}
+              {skippedCount} imported row{skippedCount === 1 ? '' : 's'} can&apos;t be deleted and
+              will be skipped.
+            </>
+          )}
         </p>
         <div className="dialog-actions">
           <button onClick={() => deleteDialogRef.current?.close()}>Cancel</button>
           <button
             className="danger"
             onClick={() => {
-              bulkDeleteMutation.mutate(Array.from(selectedIds))
+              bulkDeleteMutation.mutate(manualSelectedIds)
               deleteDialogRef.current?.close()
             }}
           >
