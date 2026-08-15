@@ -202,10 +202,11 @@ function weekStartOf(d: Date): string {
   return utc.toISOString().slice(0, 10)
 }
 
-// The six selectable weeks: last 2, current, next 3 (as Friday start dates).
-function weekOptions(): { value: string; current: boolean }[] {
+// Selectable weeks as Friday start dates: `back` past weeks, the current one, next 3.
+// The "1k Budget Spent" card looks 3 weeks back; the top-up modal keeps the default 2.
+function weekOptions(back = 2): { value: string; current: boolean }[] {
   const base = new Date(weekStartOf(new Date()) + 'T00:00:00Z')
-  return [-2, -1, 0, 1, 2, 3].map((i) => {
+  return Array.from({ length: back + 4 }, (_, idx) => idx - back).map((i) => {
     const d = new Date(base)
     d.setUTCDate(d.getUTCDate() + i * 7)
     return { value: d.toISOString().slice(0, 10), current: i === 0 }
@@ -612,8 +613,13 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
   const balanceOf = (tx: Transaction): number | null =>
     tx.balance != null ? parseFloat(tx.balance) : null
 
+  // Monthly bills are budgeted separately from the $1,000 weekly allowance, so their
+  // rows leave the 1K Weekly Balance cell blank rather than showing a figure that
+  // doesn't apply to them. The server still computes the running balance normally.
   const weeklyBalanceOf = (tx: Transaction): number | null =>
-    tx.weekly_balance != null ? parseFloat(tx.weekly_balance) : null
+    tx.weekly_balance != null && tx.category?.trim().toUpperCase() !== 'MONTHLY BILLS'
+      ? parseFloat(tx.weekly_balance)
+      : null
 
   // Every row is selectable, imported ones included, so any set of amounts can be
   // totaled. Bulk actions still only touch the manual subset (enforced server-side too).
@@ -815,7 +821,7 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
                 onChange={(e) => setTotalWeek(e.target.value)}
                 aria-label="Select week"
               >
-                {weekOptions().map((w) => (
+                {weekOptions(3).map((w) => (
                   <option key={w.value} value={w.value}>
                     {formatWeekRange(w.value)}{w.current ? ' (this week)' : ''}
                   </option>
