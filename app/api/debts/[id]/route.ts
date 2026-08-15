@@ -3,11 +3,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import { query } from '@/lib/db'
+import { paidWithFor } from '@/lib/debts'
 
 const updateSchema = z.object({
   name: z.string().min(1),
   category: z.string().nullable().optional(),
   term: z.enum(['short', 'long']),
+  paid_with: z.enum(['bank', 'chase_cc', 'boa_cc']).nullable().optional(),
 })
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
@@ -24,10 +26,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   const result = await query(
     `UPDATE debt_accounts
-     SET name = $3, category = $4, term = $5, updated_at = NOW()
+     SET name = $3, category = $4, term = $5, paid_with = $6, updated_at = NOW()
      WHERE id = $1 AND user_id = $2
      RETURNING id`,
-    [params.id, session.user.id, d.name, d.category ?? null, d.term]
+    [params.id, session.user.id, d.name, d.category ?? null, d.term, paidWithFor(d.term, d.paid_with)]
   )
   if (result.rowCount === 0) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })

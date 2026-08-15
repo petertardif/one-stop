@@ -3,11 +3,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import { pool, query } from '@/lib/db'
+import { paidWithFor } from '@/lib/debts'
 
 const createSchema = z.object({
   name: z.string().min(1),
   category: z.string().nullable().optional(),
   term: z.enum(['short', 'long']).default('long'),
+  // Which account the debt is paid from. Long-term debts don't carry one — see
+  // `paidWithFor` below.
+  paid_with: z.enum(['bank', 'chase_cc', 'boa_cc']).nullable().optional(),
   // Optional opening balance — recorded as the debt's first snapshot.
   balance: z.number().nonnegative().nullable().optional(),
   as_of: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -23,7 +27,7 @@ export async function GET() {
   }
 
   const rows = await query(
-    `SELECT d.id, d.name, d.category, d.term, d.sort_order, d.paid_at,
+    `SELECT d.id, d.name, d.category, d.term, d.paid_with, d.sort_order, d.paid_at,
             COALESCE(
               (SELECT json_agg(json_build_object('id', s.id, 'as_of', s.as_of, 'balance', s.balance)
                        ORDER BY s.as_of DESC)
@@ -65,11 +69,11 @@ export async function POST(req: NextRequest) {
     await client.query('BEGIN')
 
     const result = await client.query<{ id: string }>(
-      `INSERT INTO debt_accounts (user_id, name, category, term, sort_order)
-       VALUES ($1, $2, $3, $4,
+      `INSERT INTO debt_accounts (user_id, name, category, term, paid_with, sort_order)
+       VALUES ($1, $2, $3, $4, $5,
                (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM debt_accounts WHERE user_id = $1))
        RETURNING id`,
-      [session.user.id, d.name, d.category ?? null, d.term]
+      [session.user.id, d.name, d.category ?? null, d.term, paidWithFor(d.term, d.paid_with)]
     )
     const id = result.rows[0].id
 
