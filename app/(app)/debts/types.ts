@@ -1,3 +1,5 @@
+import type { BudgetAccount } from '@/components/BudgetAccount'
+
 export type Term = 'short' | 'long'
 
 export interface DebtSnapshot {
@@ -11,6 +13,9 @@ export interface DebtAccount {
   name: string
   category: string | null
   term: Term
+  // Which account the debt is paid from. null = N/A. Always null for long-term
+  // debts — the column only exists on the Short Term and Paid Off tabs.
+  paid_with: BudgetAccount | null
   sort_order: number | null
   paid_at: string | null
   snapshots: DebtSnapshot[]

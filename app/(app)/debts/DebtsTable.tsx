@@ -11,14 +11,17 @@ import { RecordModal, ModalField } from '@/components/RecordModal'
 import { DebtCharts } from './DebtCharts'
 import { DebtAccount, DebtsResponse, Term, totalPaidOff } from './types'
 import { Tooltip } from '@/components/Tooltip'
+import { BUDGET_ACCOUNTS, BudgetAccountIcon, budgetAccountLabel, type BudgetAccount } from '@/components/BudgetAccount'
 
 type Tab = 'short' | 'long' | 'paid'
-type SortKey = 'name' | 'category' | 'latest' | 'change' | 'latestDate' | 'term'
+type SortKey = 'name' | 'category' | 'paidWith' | 'latest' | 'change' | 'latestDate' | 'term'
 
 interface FormState {
   name: string
   category: string
   term: Term
+  // Which account the debt is paid from; '' = N/A. Short-term only — see `bodyOf`.
+  paid_with: '' | BudgetAccount
   // New-row only: the debt's opening balance, recorded as its first snapshot.
   balance: string
   as_of: string
@@ -33,7 +36,7 @@ const todayStr = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-const emptyForm = (term: Term): FormState => ({ name: '', category: '', term, balance: '', as_of: todayStr() })
+const emptyForm = (term: Term): FormState => ({ name: '', category: '', term, paid_with: '', balance: '', as_of: todayStr() })
 const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 // latest balance + change vs the prior snapshot (rows are newest-first).
@@ -86,7 +89,14 @@ export function DebtsTable({ role }: { role: string }) {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['debts'] })
 
-  const bodyOf = (f: FormState) => ({ name: f.name, category: f.category || null, term: f.term })
+  // A long-term debt never carries a Paid With value (the column isn't on that tab),
+  // so switching a debt to Long clears it. The API enforces the same rule.
+  const bodyOf = (f: FormState) => ({
+    name: f.name,
+    category: f.category || null,
+    term: f.term,
+    paid_with: f.term === 'long' ? null : f.paid_with || null,
+  })
 
   const createMutation = useMutation({
     mutationFn: async (f: FormState) => {
@@ -183,7 +193,10 @@ export function DebtsTable({ role }: { role: string }) {
 
   const rows = data?.rows ?? []
   const paidTab = tab === 'paid'
-  const colCount = 8
+  // "Paid With" is shown on Short Term and Paid Off only — long-term debts aren't
+  // paid from one of the household accounts, so that tab keeps its original columns.
+  const showPaidWith = tab === 'short' || paidTab
+  const colCount = showPaidWith ? 9 : 8
 
   const categoryOptions = useMemo(() => {
     const set = new Set<string>(DEBT_CATEGORIES)
@@ -210,6 +223,8 @@ export function DebtsTable({ role }: { role: string }) {
         switch (sortKey) {
           case 'name': return r.name.toLowerCase()
           case 'category': return (r.category ?? '').toLowerCase()
+          // Sort by the visible label so the order matches what the icons read as.
+          case 'paidWith': return r.paid_with ? budgetAccountLabel(r.paid_with).toLowerCase() : ''
           case 'latest': return paidTab ? totalPaidOff(r) : (derive(r).latest ?? -Infinity)
           case 'change': return derive(r).change ?? -Infinity
           case 'latestDate': return derive(r).latestDate ?? ''
@@ -258,6 +273,7 @@ export function DebtsTable({ role }: { role: string }) {
     setTab(t); setSelectedIds(new Set()); setEditingId(null)
     if (sortKey === 'term' && t !== 'paid') setSortKey(null)
     if (sortKey === 'change' && t === 'paid') setSortKey(null)
+    if (sortKey === 'paidWith' && t === 'long') setSortKey(null)
   }
 
   const toggleSelect = (id: string) =>
@@ -279,7 +295,7 @@ export function DebtsTable({ role }: { role: string }) {
 
   const startEdit = (d: DebtAccount) => {
     setEditingId(d.id)
-    setForm({ ...emptyForm(d.term), name: d.name, category: d.category ?? '' })
+    setForm({ ...emptyForm(d.term), name: d.name, category: d.category ?? '', paid_with: d.paid_with ?? '' })
   }
 
   const openSnapshotModal = () => {
@@ -310,12 +326,25 @@ export function DebtsTable({ role }: { role: string }) {
     newDialogRef.current?.showModal()
   }
 
-  // Editable cells for the inline editing row — name / category / term only.
-  // Balances live in the row's drill-down, not here.
+  // Editable cells for the inline editing row — name / category / paid with / term.
+  // Balances live in the row's drill-down, not here. The Paid With cell is emitted
+  // only on the tabs that show that column, so the row stays aligned to the header.
   const formCells = (state: FormState, set: (f: FormState) => void) => (
     <>
       <td><input value={state.name} onChange={(e) => set({ ...state, name: e.target.value })} placeholder="Debt name" /></td>
       <td><input list="debt-category-list" value={state.category} onChange={(e) => set({ ...state, category: e.target.value.toUpperCase() })} placeholder="Category" /></td>
+      {showPaidWith && (
+        <td className="col-center">
+          <select
+            value={state.paid_with}
+            onChange={(e) => set({ ...state, paid_with: e.target.value as '' | BudgetAccount })}
+            aria-label="Paid with"
+          >
+            <option value="">N/A</option>
+            {BUDGET_ACCOUNTS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+          </select>
+        </td>
+      )}
       <td className="amount-col col-center">
         <select value={state.term} onChange={(e) => set({ ...state, term: e.target.value as Term })}>
           <option value="short">Short Term</option>
@@ -384,6 +413,7 @@ export function DebtsTable({ role }: { role: string }) {
               <th></th>
               {sortableTh('name', 'Name')}
               {sortableTh('category', 'Category')}
+              {showPaidWith && sortableTh('paidWith', 'Paid With', 'col-center')}
               {sortableTh('latest', paidTab ? 'Total Paid Off' : 'Latest Balance', 'amount-col col-center')}
               {!paidTab && sortableTh('change', 'Change', 'amount-col col-center')}
               {sortableTh('latestDate', 'Latest Date', 'col-center')}
@@ -430,6 +460,16 @@ export function DebtsTable({ role }: { role: string }) {
                     </td>
                     <td>{d.name}</td>
                     <td>{d.category ?? ''}</td>
+                    {showPaidWith && (
+                      <td className="col-center">
+                        {d.paid_with && (
+                          <BudgetAccountIcon
+                            account={d.paid_with}
+                            tooltip={`Paid with ${budgetAccountLabel(d.paid_with)}`}
+                          />
+                        )}
+                      </td>
+                    )}
                     <td className="amount-col col-center">
                       {paidTab ? money(totalPaidOff(d)) : (latest != null ? money(latest) : '—')}
                     </td>
@@ -460,7 +500,7 @@ export function DebtsTable({ role }: { role: string }) {
                     <tr className="inv-detail-row">
                       <td></td>
                       <td></td>
-                      <td colSpan={6}>
+                      <td colSpan={colCount - 2}>
                         <div className="inv-detail">
                           <div className="inv-detail-history">
                             <h3>Balance history</h3>
@@ -524,6 +564,7 @@ export function DebtsTable({ role }: { role: string }) {
             <tfoot>
               <tr className="budget-total-row">
                 <td></td><td></td><td>Total</td><td></td>
+                {showPaidWith && <td></td>}
                 <td className="amount-col col-center">{money(grandTotal)}</td>
                 <td></td><td></td><td></td>
               </tr>
@@ -553,6 +594,17 @@ export function DebtsTable({ role }: { role: string }) {
             <option value="long">Long Term</option>
           </select>
         </ModalField>
+        {/* Long-term debts don't carry a Paid With value, so the field drops out
+            when Term is switched to Long. Defaults to N/A. */}
+        {newRow.term === 'short' && (
+          <ModalField label="Paid With">
+            <select value={newRow.paid_with}
+              onChange={(e) => setNewRow({ ...newRow, paid_with: e.target.value as '' | BudgetAccount })}>
+              <option value="">N/A</option>
+              {BUDGET_ACCOUNTS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+            </select>
+          </ModalField>
+        )}
         <ModalField label="Balance">
           <input type="number" step="0.01" min="0" value={newRow.balance} placeholder="0.00"
             onChange={(e) => setNewRow({ ...newRow, balance: e.target.value })} />

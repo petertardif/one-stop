@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, Fragment } from 'react'
-import { Pencil, Trash2, Check, X, Landmark, CreditCard, StickyNote, Banknote, SlidersHorizontal, Plus, Copy, RefreshCw, Wallet, CalendarDays, CheckCheck, ChevronDown, FilterX } from 'lucide-react'
+import { Pencil, Trash2, Check, X, StickyNote, Banknote, SlidersHorizontal, Plus, Copy, RefreshCw, Wallet, CalendarDays, CheckCheck, ChevronDown, FilterX } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Spinner } from '@/components/Spinner'
 import { RecordModal, ModalField } from '@/components/RecordModal'
 import { Tooltip } from '@/components/Tooltip'
 import { ColumnFilter, type ColumnFilterOption } from '@/components/ColumnFilter'
+import { BUDGET_ACCOUNTS, BudgetAccountIcon, budgetAccountLabel, type BudgetAccount } from '@/components/BudgetAccount'
 
 
 interface Account {
@@ -17,22 +18,8 @@ interface Account {
 }
 
 // A transaction's budget account. null = N/A (not in the weekly budget; no icon,
-// excluded from the card totals). The Budget column is a dropdown of these.
-type BudgetAccount = 'bank' | 'chase_cc' | 'boa_cc'
-
-const BUDGET_ACCOUNTS: { value: BudgetAccount; label: string }[] = [
-  { value: 'bank', label: 'Bank' },
-  { value: 'chase_cc', label: 'Chase CC' },
-  { value: 'boa_cc', label: 'BoA CC' },
-]
-
-// Read-view icon per account: Bank → landmark (neutral); Chase CC → credit card
-// in Chase blue; BoA CC → credit card in Bank of America red (colors via CSS).
-const BUDGET_ICON: Record<BudgetAccount, { Icon: typeof Landmark; cls: string; label: string }> = {
-  bank: { Icon: Landmark, cls: 'budget-icon--bank', label: 'Bank' },
-  chase_cc: { Icon: CreditCard, cls: 'budget-icon--chase', label: 'Chase CC' },
-  boa_cc: { Icon: CreditCard, cls: 'budget-icon--boa', label: 'BoA CC' },
-}
+// excluded from the card totals). The Budget column is a dropdown of these. The
+// options + icons are shared with the debts table's "Paid With" column.
 
 // "Mark as…" bulk-update options. Each item sets one field on the selected manual
 // rows. `divider` renders a separator after the item (Posted/Unposted vs Budget).
@@ -927,14 +914,12 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
                     {balanceOf(tx)?.toFixed(2) ?? '—'}
                   </td>
                   <td className="col-center">
-                    {tx.budget_account && (() => {
-                      const { Icon, cls, label } = BUDGET_ICON[tx.budget_account]
-                      return (
-                        <Tooltip text={`${label} — counts toward the weekly budget`}>
-                          <span className={`notes-icon ${cls}`}><Icon size={14} /></span>
-                        </Tooltip>
-                      )
-                    })()}
+                    {tx.budget_account && (
+                      <BudgetAccountIcon
+                        account={tx.budget_account}
+                        tooltip={`${budgetAccountLabel(tx.budget_account)} — counts toward the weekly budget`}
+                      />
+                    )}
                   </td>
                   <td className={`col-center ${(weeklyBalanceOf(tx) ?? 0) < 0 ? 'negative' : ''}`}>
                     {weeklyBalanceOf(tx)?.toFixed(2) ?? ''}
