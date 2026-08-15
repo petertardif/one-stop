@@ -3843,6 +3843,27 @@ p, h1, h2, h3, h4, h5, h6 {
 /* Total card shows spend (neutral, not the green "remaining" color). */
 .weekly-budget-card--total .weekly-budget-card__amount { color: var(--text-primary); }
 
+/* Checkboxes Total card: neutral at zero, green when the selection nets positive,
+   red when it nets negative. Resets the base card's always-green default. */
+.weekly-budget-card--checkbox-total .weekly-budget-card__amount { color: var(--text-primary); }
+.weekly-budget-card--checkbox-total .weekly-budget-card__amount.positive { color: #16a34a; }
+.weekly-budget-card--checkbox-total .weekly-budget-card__amount.negative { color: #dc2626; }
+
+/* Selected-count + clear control, sized like the total card's week picker. */
+.weekly-budget-card__clear {
+  margin-top: 2px;
+  padding: 1px 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.weekly-budget-card__clear:hover { color: var(--text-primary); }
+.weekly-budget-card__clear:focus-visible { outline: 1px solid var(--surface-border); border-radius: 4px; }
+
 /* Small, unobtrusive week picker inside the total card. */
 .weekly-budget-card__week {
   margin-top: 2px;
