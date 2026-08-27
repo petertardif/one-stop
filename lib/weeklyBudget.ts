@@ -2,16 +2,31 @@ import { query } from './db'
 
 export const WEEKLY_BUDGET = 1000
 
+// The Friday that starts the Fri->Thu week containing `col`. Postgres DOW has Sun=0,
+// so (dow + 2) % 7 is the number of days back to that Friday.
+export const weekStartExpr = (col: string) =>
+  `(${col} - ((EXTRACT(DOW FROM ${col})::int + 2) % 7))`
+
+// Rows that consume the $1,000 weekly allowance. MONTHLY BILLS is budgeted separately
+// (it has its own line items on /budget), so those rows are budget-flagged but
+// deliberately excluded from every weekly figure.
+//
+// The COALESCE guards the NULL-category case: `category <> '...'` evaluates to NULL,
+// not true, when category IS NULL, which would silently drop uncategorized rows from
+// the total. Assumes the transactions table is aliased `t`.
+export const COUNTS_TOWARD_WEEKLY =
+  `t.budget_flagged AND COALESCE(UPPER(TRIM(t.category)), '') <> 'MONTHLY BILLS'`
+
 export interface WeeklyBudget {
   week_start: string
   remaining: string
   spent: string
 }
 
-// A Friday→Thursday week's $1,000 allowance. Only budget-flagged transactions in
-// the window count. Defaults to the current week (from "today" in the caller's
-// timezone, not the DB's UTC); an optional `weekStart` (a Friday) selects another.
-// Amounts are signed (expenses negative):
+// A Friday→Thursday week's $1,000 allowance. Only rows matching COUNTS_TOWARD_WEEKLY
+// count (budget-flagged, excluding MONTHLY BILLS). Defaults to the current week (from
+// "today" in the caller's timezone, not the DB's UTC); an optional `weekStart` (a
+// Friday) selects another. Amounts are signed (expenses negative):
 //   remaining = 1000 + week top-ups + SUM(amount over all budget accounts)
 //   spent     = ABS(SUM(amount over Chase CC only))
 export async function getWeeklyBudget(
@@ -26,10 +41,7 @@ export async function getWeeklyBudget(
        SELECT (now() AT TIME ZONE $3::text)::date AS d
      ),
      wk AS (
-       SELECT COALESCE(
-                $2::date,
-                ((SELECT d FROM today) - ((EXTRACT(DOW FROM (SELECT d FROM today))::int + 2) % 7))
-              ) AS start
+       SELECT COALESCE($2::date, ${weekStartExpr('(SELECT d FROM today)')}) AS start
      ),
      adj AS (
        SELECT COALESCE(SUM(amount), 0) AS total
@@ -39,9 +51,12 @@ export async function getWeeklyBudget(
      flagged AS (
        -- net_all: every budget account (powers remaining -- all 3 accounts).
        -- net_chase: Chase CC only (powers spent -- the 1k Budget Spent card).
+       -- Both exclude MONTHLY BILLS via COUNTS_TOWARD_WEEKLY so the two figures agree.
        SELECT
-         COALESCE(SUM(t.amount) FILTER (WHERE t.budget_flagged), 0) AS net_all,
-         COALESCE(SUM(t.amount) FILTER (WHERE t.budget_account = 'chase_cc'), 0) AS net_chase
+         COALESCE(SUM(t.amount) FILTER (WHERE ${COUNTS_TOWARD_WEEKLY}), 0) AS net_all,
+         COALESCE(SUM(t.amount) FILTER (
+           WHERE t.budget_account = 'chase_cc' AND ${COUNTS_TOWARD_WEEKLY}
+         ), 0) AS net_chase
        FROM wk
        LEFT JOIN transactions t
          ON t.user_id = $1

@@ -23,8 +23,12 @@ interface Props {
    * renders the bare column name, which is the default (all) state.
    */
   summary?: string | null
-  /** Label for the option that clears the filter back to "all". */
-  allLabel: string
+  /**
+   * Label for the option that clears the filter back to "all". Omit for a picker where
+   * every option is a concrete choice and "all" is meaningless (the 1k Weekly week
+   * picker) — the clear option is then not rendered at all.
+   */
+  allLabel?: string
   /** Optional leading icon, e.g. the calendar on the Period chip. */
   icon?: React.ReactNode
   /**
@@ -200,19 +204,21 @@ export function ColumnFilter({
               visibility: pos ? 'visible' : 'hidden',
             }}
           >
-            <button
-              type="button"
-              role="option"
-              aria-selected={isAll}
-              className={['column-filter__option', isAll ? 'selected' : ''].filter(Boolean).join(' ')}
-              onClick={() => {
-                onChange([])
-                if (mode === 'single') setOpen(false)
-              }}
-            >
-              <span className="column-filter__check">{isAll && <Check size={13} />}</span>
-              {allLabel}
-            </button>
+            {allLabel !== undefined && (
+              <button
+                type="button"
+                role="option"
+                aria-selected={isAll}
+                className={['column-filter__option', isAll ? 'selected' : ''].filter(Boolean).join(' ')}
+                onClick={() => {
+                  onChange([])
+                  if (mode === 'single') setOpen(false)
+                }}
+              >
+                <span className="column-filter__check">{isAll && <Check size={13} />}</span>
+                {allLabel}
+              </button>
+            )}
 
             {options.map((opt) => {
               const isSel = selected.includes(opt.value)

@@ -59,7 +59,11 @@ Compact tiles, each a link to its module: **This Week's 1k** (weekly remaining +
 
 ---
 
-### 3. Monthly Budget / Ledger (`/app/monthly`)
+### 3. Ledgers (`/app/monthly`)
+
+The page is titled **Ledgers** and has two tabs (same `.account-tabs` pattern as /debts, local state, no URL param): **Ledger** (default — the full transaction ledger described below) and **1k Weekly** (§3.0.1). The shell — heading + tab strip — lives in `LedgerTabs.tsx`; each tab renders its own content component.
+
+#### Ledger tab
 
 A full transaction ledger showing credits and debits from the family's checking account and credit cards. Transactions are pulled from Plaid-connected accounts and stored locally. Manual entries (not tied to any bank account) can also be added.
 
@@ -86,7 +90,7 @@ A full transaction ledger showing credits and debits from the family's checking 
 | Amount | Positive = credit (green), negative = debit (red) |
 | Balance | Running checkbook balance, stored per row (`transactions.balance`) and shown in `seq` order; server-maintained on create/update/delete so period/account filters never recompute it |
 | Budget | Account dropdown (edit/new rows): **N/A** (null) · **Bank** · **Chase CC** · **BoA CC**. A settled row shows an icon: Bank → landmark (neutral); Chase CC → credit-card in Chase blue `#117ACA`; BoA CC → credit-card in BoA red `#E31837`; N/A → nothing. `budget_flagged` (= `budget_account IS NOT NULL`, kept in sync by the API) still marks "in the weekly budget" for the remaining card + 1K Weekly Balance column (all three accounts). |
-| 1K Weekly Balance | Per-week $1,000 allowance. Each week runs **Friday → Thursday**; every budget-flagged transaction in the week deducts from that week's $1,000 (resets to $1,000 each Friday). A week's base can be **topped up** (see below), so the effective allowance is `$1,000 + week top-ups`. Displayed on every row as the remaining allowance as of that row's position in its week (weeks with no flagged spend / top-ups show 1000.00) — **except rows categorized `MONTHLY BILLS`, whose cell is left blank**, since monthly bills are budgeted separately from the weekly allowance. Blanking is display-only; the server still computes the running weekly balance across the full ledger unchanged. Computed server-side via a window function over the full ledger (never recomputed from the filtered subset). Independent of the regular Balance column — flagged transactions still hit Balance normally; the 1K weekly balance never affects Balance. |
+| 1K Weekly Balance | Per-week $1,000 allowance. Each week runs **Friday → Thursday**; every budget-flagged transaction in the week deducts from that week's $1,000 (resets to $1,000 each Friday). A week's base can be **topped up** (see below), so the effective allowance is `$1,000 + week top-ups`. **Rows categorized `MONTHLY BILLS` are excluded from the weekly allowance entirely** — they are budgeted separately via /budget, so they never deduct from the $1,000 anywhere (ledger column, remaining/spent cards, dashboard tile, 1k Weekly tab) and their cell here is left blank. The single rule lives in `COUNTS_TOWARD_WEEKLY` (`lib/weeklyBudget.ts`), used by every weekly query. Displayed on every other row as the remaining allowance as of that row's position in its week (weeks with no counting spend / top-ups show 1000.00). Computed server-side via a window function over the full ledger (never recomputed from the filtered subset). Independent of the regular Balance column — flagged transactions still hit Balance normally; the 1K weekly balance never affects Balance. |
 | Notes | Editable free text. In the read view, shown as a note icon only (when notes exist); hovering the icon reveals the full note text. **Check # lives here too**: there is no standalone Check # column — in edit/new rows the Notes cell stacks a check-# input above the notes input (placeholders "Add check # here" / "Add notes here"); in the read view a **banknote** icon appears beside the notes icon when a check # exists, its tooltip reading `#<number>`. (`transactions.check_number` is unchanged.) |
 
 (The `transactions.account_id`/Source is retained in the DB but no longer shown as a column.)
@@ -122,11 +126,30 @@ A full transaction ledger showing credits and debits from the family's checking 
 - `POST /api/transactions/bulk-delete` — `{ ids: [] }`; delete manual rows, re-shift running balances (transactional)
 - `POST /api/transactions/bulk-duplicate` — `{ ids: [] }`; copy rows as manual, keep date, prefix description `Copy of: ` (transactional)
 - `POST /api/transactions/bulk-update` — `{ ids, field: 'is_posted'|'budget_account', value }`; mass "Mark as…" update of one field across selected manual rows (admin). `budget_account` also syncs `budget_flagged`; no `balance` impact
-- `GET /api/transactions/weekly-budget[?week_start=YYYY-MM-DD][&tz=IANA]` — for a Fri→Thu week (the given Friday, else the **current** week computed from today in the client's `tz`, not UTC), returns `remaining` (`$1,000 + week top-ups + spend across **all** budget accounts`) and `spent` (`ABS(SUM(amount))` over **Chase CC only**), independent of the ledger's period filter. Powers the two cards above the filter row: a fixed **current-week remaining** card (all accounts) and a **1k Budget Spent** total card (**Chase CC only**) whose own small week dropdown (last 3 / current / next 3, defaulting to current) selects the week to sum.
+- `GET /api/transactions/weekly-budget[?week_start=YYYY-MM-DD][&tz=IANA]` — for a Fri→Thu week (the given Friday, else the **current** week computed from today in the client's `tz`, not UTC), returns `remaining` (`$1,000 + week top-ups + spend across **all** budget accounts`) and `spent` (`ABS(SUM(amount))` over **Chase CC only**), independent of the ledger's period filter. Powers the two cards above the filter row: a fixed **current-week remaining** card (all accounts) and a **1k Budget Spent** total card (**Chase CC only**) whose own small week dropdown (last 3 / current / next 3, defaulting to current) selects the week to sum. Both figures exclude `MONTHLY BILLS`.
+- `PUT /api/transactions/weekly-budget/[id]` — `{ week_start, amount }`; correct a top-up's amount or move it to another week (admin). No DELETE exists yet — a stray top-up can only be re-aimed or re-valued.
+- `GET /api/weekly/weeks[?tz=IANA]` — Fridays the 1k Weekly tab can show: weeks with counting spend or a top-up, plus the current week and the next 4 (always, so future weeks are reachable before they have data). Newest first, with the current week returned alongside.
+- `GET /api/weekly?week_start=YYYY-MM-DD&tz=IANA` — one week's contents: `{ week_start, allowance, remaining, spent, transactions[], adjustments[] }`. `week_start` is **normalized to its Friday** server-side rather than trusted. Transactions reuse the ledger's full-history `weekly_balance` window, then narrow to the week; `remaining`/`spent` come from the shared `getWeeklyBudget`.
 - `POST /api/transactions/weekly-budget` — `{ week_start, amount }`; add a top-up to a week's 1K allowance (admin). Raises the weekly balance only; no ledger row, no checkbook impact.
 - `POST /api/plaid/link-token` — create Plaid Link token
 - `POST /api/plaid/exchange-token` — exchange public token, store access token, create account records
 - `POST /api/plaid/sync` — pull 90 days of transactions from Plaid, upsert by `plaid_transaction_id`
+
+#### 1k Weekly tab
+
+A single Fri→Thu week's $1,000 allowance in isolation: what consumed it, in running-balance order. Read-mostly — the ledger remains the place transactions are edited.
+
+**Week picker** — a `.filter-chip` `ColumnFilter` (single-select, no "all" option — `allLabel` is omitted, which suppresses that row) listing every week with counting spend or a top-up, **plus the current week and the next 4 always**, so a future week can be topped up before anything lands in it. Newest first, labelled "Aug 21 – Aug 27", with " (this week)" on the current one. Defaults to the current week.
+
+**Cards** — a **1k Budget Spent** card totalling the *selected* week (Chase CC only, same figure as the Ledger tab's card but following this tab's week rather than its own dropdown), and the shared **Checkboxes Total** card.
+
+**Table columns:** select checkbox · Date · Posted · Category · Description · Amount · Budget · 1K Weekly Balance · Actions.
+
+Rows are of two kinds, merged into one list:
+- **Transactions** — the week's counting rows (budget-flagged, `MONTHLY BILLS` excluded), newest-first by `seq`, each showing the ledger's running `weekly_balance`. Read-only: no edit icon.
+- **Top-ups** — each `weekly_budget_adjustments` row for the week, dated the week's Friday, described "1K allowance top-up", with the week's opening allowance (`$1,000 + top-ups`) in the balance column. Sorted to the **bottom**, since a top-up applies flat from the week's start rather than at a position in the running order. These are the **only editable rows on the tab** (admin): the ✎ opens a modal to correct the amount or move it to another week.
+
+**Selection** — checkboxes on both row kinds feed the Checkboxes Total card; selection survives changing weeks (the card's Clear resets it). There are **no bulk actions** on this tab.
 
 ### 3.1 Budget (`/app/budget`)
 
@@ -519,7 +542,7 @@ contacts            id, name, role, firm, phone, email, notes, created_at, updat
 /contingency/vault/[category]
 /contingency/print
 
-/monthly                     (sidebar "Financials" > "Ledger")
+/monthly                     (sidebar "Financials" > "Ledger"; page title "Ledgers", tabs: Ledger | 1k Weekly)
 /budget                      (Financials > "Budget" — line-item budget table)
 /debts                       (Financials > "Debts" — Short Term / Long Term / Paid Off ledger)
 /subscriptions               (Financials > "Subscriptions" — Active / Cancelled ledger)

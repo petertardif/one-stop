@@ -3672,6 +3672,9 @@ p, h1, h2, h3, h4, h5, h6 {
 }
 .record-field input[type="checkbox"] { width: auto; align-self: start; }
 
+/* Explanatory note under a field (e.g. what moving a 1K top-up to another week does). */
+.record-field__hint { font-size: 0.72rem; color: var(--text-secondary); }
+
 @media (max-width: 560px) {
   .record-form-grid { grid-template-columns: 1fr; }
 }

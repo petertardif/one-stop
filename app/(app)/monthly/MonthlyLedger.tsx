@@ -8,6 +8,9 @@ import { RecordModal, ModalField } from '@/components/RecordModal'
 import { Tooltip } from '@/components/Tooltip'
 import { ColumnFilter, type ColumnFilterOption } from '@/components/ColumnFilter'
 import { BUDGET_ACCOUNTS, BudgetAccountIcon, budgetAccountLabel, type BudgetAccount } from '@/components/BudgetAccount'
+import { CheckboxesTotalCard, useRowSelection } from '@/components/CheckboxesTotal'
+import { money } from '@/lib/format'
+import { formatWeekRange, userTz, weekStartOf } from './weeks'
 
 
 interface Account {
@@ -153,41 +156,8 @@ function formatMoneyCents(raw: string): string {
   return (parseInt(digits, 10) / 100).toFixed(2)
 }
 
-// Display money as $1,234.56 / -$1,234.56 (sign leads the currency symbol).
-function money(n: number): string {
-  const abs = Math.abs(n).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-  return `${n < 0 ? '-' : ''}$${abs}`
-}
-
-// What the ledger remembers about a checked row. Selection outlives the page the row
-// was checked on, so the amount is cached here rather than looked up in `transactions`.
-type SelectedRow = { amount: number; isManual: boolean }
-
 type Period = 'all' | '3m' | '6m' | string // string covers 'YYYY' and 'YYYY-MM'
 type PostedFilter = 'all' | 'posted' | 'unposted'
-
-// Format a Friday week-start (YYYY-MM-DD) as "Jul 11 – Jul 17" (Fri → Thu).
-// Parse/format in UTC so the date the server computed isn't shifted by timezone.
-function formatWeekRange(weekStart: string): string {
-  const start = new Date(weekStart + 'T00:00:00Z')
-  const end = new Date(start)
-  end.setUTCDate(end.getUTCDate() + 6)
-  const fmt = (d: Date) =>
-    d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
-  return `${fmt(start)} – ${fmt(end)}`
-}
-
-// Friday (YYYY-MM-DD) that starts the Fri→Thu week containing `d`, matching the
-// ledger's SQL week key. Computed in UTC so it never shifts by a day.
-function weekStartOf(d: Date): string {
-  const offset = (d.getDay() + 2) % 7 // Fri(5)→0, Thu(4)→6
-  const utc = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
-  utc.setUTCDate(utc.getUTCDate() - offset)
-  return utc.toISOString().slice(0, 10)
-}
 
 // Selectable weeks as Friday start dates: `back` past weeks, the current one, next 3.
 // The "1k Budget Spent" card looks 3 weeks back; the top-up modal keeps the default 2.
@@ -233,13 +203,6 @@ function adjacentMonth(period: string, direction: -1 | 1): string {
 
 // The browser's IANA timezone, so server-side "today" math (current week, the
 // 3m/6m period filters) matches the user's local date instead of the DB's UTC.
-function userTz(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-  } catch {
-    return 'UTC'
-  }
-}
 
 interface TxPage {
   rows: Transaction[]
@@ -303,11 +266,10 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(100)
   const [syncing, setSyncing] = useState(false)
-  // Selection survives paging and filter changes, so a selected row is often not on
-  // the current page — cache each row's amount at check time (the fetched
-  // `transactions` only ever holds the visible page) along with whether it is manual,
-  // which is what the bulk actions are allowed to touch.
-  const [selected, setSelected] = useState<Map<string, SelectedRow>>(new Map())
+  // Selection survives paging and filter changes, so a selected row is often not on the
+  // current page. The shared hook caches each row's amount at check time; the ledger's
+  // `meta` remembers whether the row is manual, which is what bulk actions may touch.
+  const selection = useRowSelection<boolean>()
   const tableRef = useRef<HTMLTableElement>(null)
   const deleteDialogRef = useRef<HTMLDialogElement>(null)
   const filtersDialogRef = useRef<HTMLDialogElement>(null)
@@ -440,7 +402,7 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
     onSuccess: (_data, ids) => {
       qc.invalidateQueries({ queryKey: ['transactions'] })
       qc.invalidateQueries({ queryKey: ['weekly-budget'] })
-      deselect(ids)
+      selection.deselect(ids)
     },
   })
 
@@ -456,7 +418,7 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
     onSuccess: (_data, ids) => {
       qc.invalidateQueries({ queryKey: ['transactions'] })
       qc.invalidateQueries({ queryKey: ['weekly-budget'] })
-      deselect(ids)
+      selection.deselect(ids)
     },
   })
 
@@ -472,26 +434,16 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
     onSuccess: (_data, { ids }) => {
       qc.invalidateQueries({ queryKey: ['transactions'] })
       qc.invalidateQueries({ queryKey: ['weekly-budget'] })
-      deselect(ids)
+      selection.deselect(ids)
     },
   })
 
-  const toggleSelect = (tx: Transaction) =>
-    setSelected((prev) => {
-      const next = new Map(prev)
-      if (next.has(tx.id)) next.delete(tx.id)
-      else next.set(tx.id, { amount: parseFloat(tx.amount), isManual: tx.is_manual })
-      return next
-    })
-
-  // Drop the rows a bulk action just handled, leaving the rest of the selection (and
-  // so the Checkboxes Total) intact — imported rows the server skipped stay checked.
-  const deselect = (ids: string[]) =>
-    setSelected((prev) => {
-      const next = new Map(prev)
-      for (const id of ids) next.delete(id)
-      return next
-    })
+  // A transaction as the selection hook sees it: amount to total, `meta` = is_manual.
+  const selectableRow = (tx: Transaction) => ({
+    id: tx.id,
+    amount: parseFloat(tx.amount),
+    meta: tx.is_manual,
+  })
 
   const openAddTx = useCallback(() => {
     setTxForm(emptyTx())
@@ -542,23 +494,11 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
   //
   // A cached amount goes stale if the row is edited, so re-sync every selected row
   // that is on the current page whenever the page data changes.
+  const syncSelection = selection.sync
   useEffect(() => {
-    setSelected((prev) => {
-      if (prev.size === 0) return prev
-      let changed = false
-      const next = new Map(prev)
-      for (const tx of transactions) {
-        const cur = next.get(tx.id)
-        if (!cur) continue
-        const amount = parseFloat(tx.amount)
-        if (cur.amount !== amount || cur.isManual !== tx.is_manual) {
-          next.set(tx.id, { amount, isManual: tx.is_manual })
-          changed = true
-        }
-      }
-      return changed ? next : prev
-    })
-  }, [transactions])
+    syncSelection(transactions.map(selectableRow))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, syncSelection])
 
   // Filters / page-size change the result set — jump back to page 1.
   useEffect(() => {
@@ -611,13 +551,12 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
   // Every row is selectable, imported ones included, so any set of amounts can be
   // totaled. Bulk actions still only touch the manual subset (enforced server-side too).
   const selectableIds = sortedTx.map((tx) => tx.id)
-  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id))
-  const someSelected = selectableIds.some((id) => selected.has(id))
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selection.has(id))
+  const someSelected = selectableIds.some((id) => selection.has(id))
 
-  const manualSelectedIds = Array.from(selected)
-    .filter(([, row]) => row.isManual)
-    .map(([id]) => id)
-  const skippedCount = selected.size - manualSelectedIds.length
+  // `meta` is is_manual — only those rows may be deleted/duplicated/marked.
+  const manualSelectedIds = selection.entries.filter(([, row]) => row.meta).map(([id]) => id)
+  const skippedCount = selection.size - manualSelectedIds.length
 
   // Header check-all: indeterminate when only some visible rows are selected.
   useEffect(() => {
@@ -629,19 +568,7 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
   // Adds/removes the visible page only — off-page selections are left alone, since
   // the header box speaks for this page. The card's Clear is the global reset.
   const toggleSelectAll = (checked: boolean) =>
-    setSelected((prev) => {
-      const next = new Map(prev)
-      for (const tx of sortedTx) {
-        if (checked) next.set(tx.id, { amount: parseFloat(tx.amount), isManual: tx.is_manual })
-        else next.delete(tx.id)
-      }
-      return next
-    })
-
-  // Sum in whole cents so a set that nets out reads as an exact 0.00 (and black).
-  const checkboxesTotal =
-    Array.from(selected.values()).reduce((sum, row) => sum + Math.round(row.amount * 100), 0) / 100
-  const totalTone = checkboxesTotal > 0 ? 'positive' : checkboxesTotal < 0 ? 'negative' : ''
+    selection.setMany(sortedTx.map(selectableRow), checked)
 
   const filtersActive = selectedCategories.length > 0 || postedFilter !== 'all'
 
@@ -780,11 +707,11 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
     )
   }
 
+  // The page shell (.monthly-ledger, the "Ledgers" heading, the tab strip) lives in
+  // LedgerTabs — this is the Ledger tab's content only.
   return (
-    <div className="monthly-ledger">
+    <>
       <div className="ledger-header">
-        <h1>Monthly Budget</h1>
-
         <div className="weekly-cards">
           {weeklyRemaining !== null && weeklyBudget && (
             <div className="weekly-budget-card">
@@ -821,26 +748,9 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
             </div>
           </div>
 
-          {/* Running total of every checked row, across pages and filters. Only
-              rendered while something is selected. */}
-          {selected.size > 0 && (
-            <div className="weekly-budget-card weekly-budget-card--checkbox-total">
-              <div className="weekly-budget-card__info">
-                <span className="weekly-budget-card__label">Checkboxes Total</span>
-                <button
-                  type="button"
-                  className="weekly-budget-card__clear"
-                  onClick={() => setSelected(new Map())}
-                >
-                  {selected.size} selected — Clear
-                </button>
-              </div>
-              <div className={`weekly-budget-card__amount ${totalTone}`}>
-                {money(checkboxesTotal)}
-                <span className="weekly-budget-card__amount-label">total</span>
-              </div>
-            </div>
-          )}
+          {/* Running total of every checked row, across pages and filters. Self-hides
+              while nothing is selected. */}
+          <CheckboxesTotalCard selection={selection} />
         </div>
 
         {/* Desktop: full inline controls row (hidden on mobile). */}
@@ -899,8 +809,8 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
                   <td className="col-center">
                     <input
                       type="checkbox"
-                      checked={selected.has(tx.id)}
-                      onChange={() => toggleSelect(tx)}
+                      checked={selection.has(tx.id)}
+                      onChange={() => selection.toggle(selectableRow(tx))}
                     />
                   </td>
                   <td>{tx.date.slice(0, 10)}</td>
@@ -1128,6 +1038,6 @@ export function MonthlyLedger({ accounts, initialPeriod }: { accounts: Account[]
           </div>
         </div>
       </dialog>
-    </div>
+    </>
   )
 }

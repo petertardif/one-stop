@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import { query } from '@/lib/db'
 import { resolveTimeZone } from '@/lib/timezone'
+import { COUNTS_TOWARD_WEEKLY, WEEKLY_BUDGET, weekStartExpr } from '@/lib/weeklyBudget'
 
 const createSchema = z.object({
   account_id: z.string().uuid().nullable().optional(),
@@ -121,15 +122,15 @@ export async function GET(req: NextRequest) {
        SELECT t.id, t.account_id, t.plaid_transaction_id, t.is_manual, t.amount,
               t.type, t.category, t.description, t.check_number, t.date, t.is_posted,
               t.budget_flagged, t.budget_account, t.balance, t.seq, t.notes, t.created_at, t.updated_at,
-              1000 + COALESCE(a.total, 0)
-                   + SUM(CASE WHEN t.budget_flagged THEN t.amount ELSE 0 END) OVER (
-                PARTITION BY (t.date - ((EXTRACT(DOW FROM t.date)::int + 2) % 7))
+              ${WEEKLY_BUDGET} + COALESCE(a.total, 0)
+                   + SUM(CASE WHEN ${COUNTS_TOWARD_WEEKLY} THEN t.amount ELSE 0 END) OVER (
+                PARTITION BY ${weekStartExpr('t.date')}
                 ORDER BY t.seq NULLS FIRST, t.date, t.created_at
                 ROWS UNBOUNDED PRECEDING
               ) AS weekly_balance
        FROM transactions t
        LEFT JOIN adj a
-         ON a.week_start = (t.date - ((EXTRACT(DOW FROM t.date)::int + 2) % 7))
+         ON a.week_start = ${weekStartExpr('t.date')}
        WHERE t.user_id = $1
      )
      SELECT l.id, l.account_id, a.name AS account_name, l.plaid_transaction_id,

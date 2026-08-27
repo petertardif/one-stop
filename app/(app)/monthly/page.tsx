@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { query } from '@/lib/db'
-import { MonthlyLedger } from './MonthlyLedger'
+import { LedgerTabs } from './LedgerTabs'
 
 interface AccountRow {
   id: string
@@ -34,7 +34,11 @@ export default async function MonthlyPage({
 
   return (
     <main>
-      <MonthlyLedger accounts={accounts} initialPeriod={searchParams.period} />
+      <LedgerTabs
+        accounts={accounts}
+        initialPeriod={searchParams.period}
+        role={session.user.role}
+      />
     </main>
   )
 }
