@@ -143,7 +143,7 @@ A single Fri→Thu week's $1,000 allowance in isolation: what consumed it, in ru
 
 **Cards** — a **1k Budget Spent** card totalling the *selected* week (Chase CC only, same figure as the Ledger tab's card but following this tab's week rather than its own dropdown), and the shared **Checkboxes Total** card.
 
-**Table columns:** select checkbox · Date · Posted · Category · Description · Amount · Budget · 1K Weekly Balance · Actions.
+**Table columns:** select checkbox · Date · Posted · Category · Description · Amount · Budget · 1K Weekly Balance · Actions. The header checkbox is a select-all over the displayed week (indeterminate when only some rows are checked), adding/removing just those rows — selections carried over from other weeks are untouched.
 
 Rows are of two kinds, merged into one list:
 - **Transactions** — the week's counting rows (budget-flagged, `MONTHLY BILLS` excluded), newest-first by `seq`, each showing the ledger's running `weekly_balance`. Read-only: no edit icon.

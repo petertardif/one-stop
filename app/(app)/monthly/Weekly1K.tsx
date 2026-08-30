@@ -62,6 +62,7 @@ export function Weekly1K({ role }: { role: string }) {
 
   // Edit-top-up modal
   const editDialogRef = useRef<HTMLDialogElement>(null)
+  const headerCheckboxRef = useRef<HTMLInputElement>(null)
   const [editId, setEditId] = useState<string | null>(null)
   const [editAmount, setEditAmount] = useState('')
   const [editWeek, setEditWeek] = useState('')
@@ -124,6 +125,21 @@ export function Weekly1K({ role }: { role: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, syncSelection])
 
+  // Header check-all, matching the ledger: it speaks for the rows on screen (this
+  // week's), so it adds/removes only those — selections on other weeks are left alone.
+  // The card's Clear is still the global reset.
+  const allSelected = rows.length > 0 && rows.every((r) => selection.has(r.id))
+  const someSelected = rows.some((r) => selection.has(r.id))
+
+  useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate = someSelected && !allSelected
+    }
+  }, [someSelected, allSelected])
+
+  const toggleSelectAll = (checked: boolean) =>
+    selection.setMany(rows.map(selectableRow), checked)
+
   const weekOptions = (weekList?.weeks ?? [week]).map((w) => ({
     value: w,
     label: `${formatWeekRange(w)}${w === weekList?.current ? ' (this week)' : ''}`,
@@ -180,7 +196,15 @@ export function Weekly1K({ role }: { role: string }) {
         <table className="ledger-table">
           <thead>
             <tr>
-              <th className="col-center"></th>
+              <th className="col-center">
+                <input
+                  ref={headerCheckboxRef}
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={(e) => toggleSelectAll(e.target.checked)}
+                  aria-label="Select all"
+                />
+              </th>
               <th>Date</th>
               <th className="col-center">Posted</th>
               <th>Category</th>
