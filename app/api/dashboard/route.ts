@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
   const userId = session.user.id
   const tz = resolveTimeZone(new URL(req.url).searchParams.get('tz'))
 
-  const [invSnaps, debtSnaps, cashFlow, monthlyAvg, nextMonthly, subs, auto, weekly] = await Promise.all([
+  const [invSnaps, debtSnaps, debtTermSnaps, cashFlow, monthlyAvg, nextMonthly, subs, auto, weekly] = await Promise.all([
     query<SnapRow>(
       `SELECT s.investment_id AS account_id, to_char(s.as_of, 'YYYY-MM-DD') AS as_of, s.value AS amount
        FROM investment_snapshots s
@@ -71,13 +71,28 @@ export async function GET(req: NextRequest) {
        WHERE d.user_id = $1 AND d.paid_at IS NULL`,
       [userId]
     ),
-    query<{ type: string; total: string }>(
-      `SELECT type, SUM(amount) AS total
+    // Every debt that is active or was paid off this year, with its term and
+    // snapshots — feeds the Short Term / Long Term tiles. paid_at is rendered
+    // as a date in the caller's timezone.
+    query<{ id: string; term: 'short' | 'long'; paid_on: string | null; as_of: string | null; balance: string | null }>(
+      `SELECT d.id, d.term, to_char(d.paid_at AT TIME ZONE $2, 'YYYY-MM-DD') AS paid_on,
+              to_char(s.as_of, 'YYYY-MM-DD') AS as_of, s.balance
+       FROM debt_accounts d
+       LEFT JOIN debt_snapshots s ON s.debt_account_id = d.id
+       WHERE d.user_id = $1
+         AND (d.paid_at IS NULL OR d.paid_at AT TIME ZONE $2 >= date_trunc('year', NOW() AT TIME ZONE $2))
+       ORDER BY d.id, s.as_of`,
+      [userId, tz]
+    ),
+    // This month's cash flow. Income = only transactions categorized INCOME (so
+    // returns, transfers in, etc. don't inflate it); expenses = every expense.
+    query<{ income: string; expenses: string }>(
+      `SELECT COALESCE(SUM(amount) FILTER (WHERE UPPER(TRIM(category)) = 'INCOME'), 0) AS income,
+              COALESCE(SUM(amount) FILTER (WHERE type = 'expense'), 0) AS expenses
        FROM transactions
        WHERE user_id = $1
          AND date >= date_trunc('month', CURRENT_DATE)
-         AND date < date_trunc('month', CURRENT_DATE) + INTERVAL '1 month'
-       GROUP BY type`,
+         AND date < date_trunc('month', CURRENT_DATE) + INTERVAL '1 month'`,
       [userId]
     ),
     query<{ monthly_average: string }>(
@@ -134,15 +149,41 @@ export async function GET(req: NextRequest) {
       return { date: day, assets: a, liabilities: l, netWorth: a - l }
     })
 
-  const income = cashFlow.rows.find((r) => r.type === 'income')
-  const expenses = cashFlow.rows.find((r) => r.type === 'expense')
+  // Short/Long Term tiles. Remaining = active debts' balance today. Paid down
+  // this year = every drop in balance during the calendar year: from the last
+  // balance before Jan 1 (if any) through each snapshot this year, and — for a
+  // debt marked paid off this year — down to $0 on its paid date. Increases
+  // (new charges) are ignored rather than netted against payments.
+  const yearStart = today.slice(0, 4) + '-01-01'
+  const debtsById = new Map<string, { term: 'short' | 'long'; paidOn: string | null; snaps: SnapPoint[] }>()
+  for (const r of debtTermSnaps.rows) {
+    const d = debtsById.get(r.id) ?? { term: r.term, paidOn: r.paid_on, snaps: [] }
+    if (r.as_of && r.balance != null) d.snaps.push({ as_of: r.as_of, amount: parseFloat(r.balance) })
+    debtsById.set(r.id, d)
+  }
+  const debtTerms = {
+    short: { remaining: 0, paidThisYear: 0 },
+    long: { remaining: 0, paidThisYear: 0 },
+  }
+  for (const d of Array.from(debtsById.values())) {
+    const t = debtTerms[d.term]
+    if (!d.paidOn) t.remaining += valueOnOrBefore<SnapPoint>(d.snaps, today, (x) => x.amount) ?? 0
+    const before = d.snaps.filter((x) => x.as_of < yearStart)
+    const path = [
+      ...(before.length ? [before[before.length - 1].amount] : []),
+      ...d.snaps.filter((x) => x.as_of >= yearStart).map((x) => x.amount),
+      ...(d.paidOn ? [0] : []),
+    ]
+    for (let i = 1; i < path.length; i++) t.paidThisYear += Math.max(0, path[i - 1] - path[i])
+  }
+
 
   return NextResponse.json({
     netWorth: { assets, liabilities, netWorth: assets - liabilities },
     netWorthHistory,
     cashFlow: {
-      income: income ? parseFloat(income.total) : 0,
-      expenses: expenses ? Math.abs(parseFloat(expenses.total)) : 0,
+      income: parseFloat(cashFlow.rows[0].income),
+      expenses: Math.abs(parseFloat(cashFlow.rows[0].expenses)),
     },
     weekly: {
       week_start: weekly.week_start,
@@ -158,5 +199,6 @@ export async function GET(req: NextRequest) {
       perMonth: parseFloat(subs.rows[0].per_month),
     },
     auto: { ytd: parseFloat(auto.rows[0].ytd) },
+    debtTerms,
   })
 }

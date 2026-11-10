@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   ResponsiveContainer, AreaChart, Area, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts'
 import { DebtAccount, latestBalance, totalPaidOff } from './types'
 import { valueOnOrBefore } from '@/lib/snapshots'
+import { Tooltip as HoverTip } from '@/components/Tooltip'
 
 type Dimension = 'category' | 'debt'
 
@@ -26,6 +27,27 @@ const balanceAsOf = (d: DebtAccount, day: string): number | null =>
   valueOnOrBefore(d.snapshots, day, (s) => parseFloat(s.balance))
 
 const fmtUsd = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+// On mobile, past this many debts the per-debt legend gets crowded: show only the
+// top few lines (by current balance, or total paid off on the Paid tab) plus
+// "+N more". Desktop always shows the full legend.
+const LEGEND_MAX_DEBTS = 5
+const LEGEND_TOP = 3
+
+// Same breakpoint as the app's mobile layout (hamburger nav) in globals.css.
+const MOBILE_QUERY = '(max-width: 768px)'
+
+function useIsMobile() {
+  const [mobile, setMobile] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_QUERY)
+    const update = () => setMobile(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+  return mobile
+}
+
 const fmtUsdFull = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export function DebtCharts({ rows, paidTab = false }: { rows: DebtAccount[]; paidTab?: boolean }) {
@@ -73,6 +95,23 @@ export function DebtCharts({ rows, paidTab = false }: { rows: DebtAccount[]; pai
       ? [{ key: 'short-term', label: SHORT_TERM_LABEL, members: shortTerm }, ...grouped]
       : grouped
   }, [rows, paidTab, nameCounts]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Legend entries for the per-debt chart. Colors follow each line's index in
+  // `series`, so they stay matched to the lines when the legend is trimmed.
+  const isMobile = useIsMobile()
+  const legend = useMemo(() => {
+    const entries = series.map((g, i) => ({
+      key: g.key, label: g.label, color: COLORS[i % COLORS.length],
+      size: g.members.reduce((t, d) => t + (paidTab ? totalPaidOff(d) : latestBalance(d)), 0),
+    }))
+    if (!isMobile || rows.length <= LEGEND_MAX_DEBTS) return { shown: entries, hidden: [] as typeof entries }
+    const ranked = [...entries].sort((a, b) => b.size - a.size)
+    const top = new Set(ranked.slice(0, LEGEND_TOP).map((e) => e.key))
+    return {
+      shown: entries.filter((e) => top.has(e.key)),
+      hidden: ranked.slice(LEGEND_TOP),
+    }
+  }, [series, rows.length, paidTab, isMobile])
 
   // Per-series balance across the snapshot dates.
   const perDebtSeries = useMemo(
@@ -161,7 +200,28 @@ export function DebtCharts({ rows, paidTab = false }: { rows: DebtAccount[]; pai
             <XAxis dataKey="date" fontSize={11} tickMargin={6} />
             <YAxis tickFormatter={fmtUsd} fontSize={11} width={64} />
             <Tooltip formatter={(v) => fmtUsdFull(Number(v))} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Legend
+              wrapperStyle={{ fontSize: 11 }}
+              content={() => (
+                <ul style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '4px 12px', margin: 0, padding: 0, listStyle: 'none' }}>
+                  {legend.shown.map((e) => (
+                    <li key={e.key} style={{ display: 'flex', alignItems: 'center', gap: 4, color: e.color }}>
+                      <svg width={14} height={14} aria-hidden><line x1={0} y1={7} x2={14} y2={7} stroke={e.color} strokeWidth={2} /></svg>
+                      {e.label}
+                    </li>
+                  ))}
+                  {legend.hidden.length > 0 && (
+                    <li>
+                      <HoverTip text={legend.hidden.map((e) => e.label).join(', ')}>
+                        <span tabIndex={0} style={{ color: 'var(--text-muted, #6b7280)', cursor: 'default' }}>
+                          +{legend.hidden.length} more
+                        </span>
+                      </HoverTip>
+                    </li>
+                  )}
+                </ul>
+              )}
+            />
             {series.map((g, i) => (
               <Line
                 key={g.key}

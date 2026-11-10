@@ -6,3 +6,11 @@ export function money(n: number): string {
   })
   return `${n < 0 ? '-' : ''}$${abs}`
 }
+
+// Cash-register money formatting: treat the raw digits as cents so the decimal
+// point is inserted automatically. '5' → '0.05', '1234' → '12.34'.
+export function formatMoneyCents(raw: string): string {
+  const digits = raw.replace(/\D/g, '')
+  if (digits === '') return ''
+  return (parseInt(digits, 10) / 100).toFixed(2)
+}

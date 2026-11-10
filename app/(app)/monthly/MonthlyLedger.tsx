@@ -9,7 +9,7 @@ import { Tooltip } from '@/components/Tooltip'
 import { ColumnFilter, type ColumnFilterOption } from '@/components/ColumnFilter'
 import { BUDGET_ACCOUNTS, BudgetAccountIcon, budgetAccountLabel, type BudgetAccount } from '@/components/BudgetAccount'
 import { CheckboxesTotalCard, useRowSelection } from '@/components/CheckboxesTotal'
-import { money } from '@/lib/format'
+import { formatMoneyCents, money } from '@/lib/format'
 import { formatWeekRange, userTz, weekStartOf } from './weeks'
 
 
@@ -147,14 +147,6 @@ const emptyTx = (): TxForm => ({
 // Plaid isn't wired up yet (no account-setup flow), so the ledger's Sync button
 // is hidden. Flip to true once /api/plaid + account connection exist.
 const SHOW_SYNC = false
-
-// Cash-register money formatting: treat the raw digits as cents so the decimal
-// point is inserted automatically. '5' → '0.05', '1234' → '12.34'.
-function formatMoneyCents(raw: string): string {
-  const digits = raw.replace(/\D/g, '')
-  if (digits === '') return ''
-  return (parseInt(digits, 10) / 100).toFixed(2)
-}
 
 type Period = 'all' | '3m' | '6m' | string // string covers 'YYYY' and 'YYYY-MM'
 type PostedFilter = 'all' | 'posted' | 'unposted'

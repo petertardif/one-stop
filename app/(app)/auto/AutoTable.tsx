@@ -7,6 +7,7 @@ import { Spinner } from '@/components/Spinner'
 import { RecordModal, ModalField } from '@/components/RecordModal'
 import { MultiSelect } from '@/components/MultiSelect'
 import { Tooltip } from '@/components/Tooltip'
+import { formatMoneyCents } from '@/lib/format'
 
 type SortKey = 'date' | 'car' | 'description' | 'cost' | 'performed_by'
 
@@ -427,8 +428,8 @@ export function AutoTable({ role }: { role: string }) {
             onChange={(e) => setNewRow({ ...newRow, description: e.target.value })} />
         </ModalField>
         <ModalField label="Cost">
-          <input type="number" step="0.01" min="0" value={newRow.cost} placeholder="0.00"
-            onChange={(e) => setNewRow({ ...newRow, cost: e.target.value })} />
+          <input type="text" inputMode="numeric" value={newRow.cost} placeholder="0.00"
+            onChange={(e) => setNewRow({ ...newRow, cost: formatMoneyCents(e.target.value) })} />
         </ModalField>
         <ModalField label="Service performed by">
           <input value={newRow.performedBy} placeholder="Performed by"

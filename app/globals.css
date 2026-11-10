@@ -3889,3 +3889,19 @@ p, h1, h2, h3, h4, h5, h6 {
 
 /* Ledger Notes column: the paired check/notes icons in the read view. */
 .ledger-cell-icons { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+
+/* Dashboard cash-flow gauge: expenses filling up against income. */
+.cash-gauge { display: flex; flex-direction: column; gap: 10px; }
+.cash-gauge__headline { font-size: 1.6rem; font-weight: 700; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.cash-gauge__headline small { font-size: 0.85rem; font-weight: 500; color: var(--text-muted); }
+.cash-gauge__headline.positive, .cash-gauge strong.positive { color: var(--color-positive); }
+.cash-gauge__headline.negative, .cash-gauge strong.negative { color: var(--color-negative); }
+.cash-gauge__track {
+  position: relative; height: 22px; border-radius: 999px; overflow: hidden;
+  background: color-mix(in srgb, var(--color-positive) 14%, transparent);
+  border: 1px solid var(--surface-border);
+}
+.cash-gauge__fill { position: absolute; inset: 0 auto 0 0; background: var(--color-positive); }
+.cash-gauge__over { position: absolute; top: 0; bottom: 0; background: var(--color-negative); }
+.cash-gauge__income-mark { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--text-primary, #222); }
+.cash-gauge__labels { display: flex; justify-content: space-between; font-size: var(--font-size-sm); color: var(--text-secondary); }

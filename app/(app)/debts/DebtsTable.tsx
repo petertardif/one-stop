@@ -12,6 +12,7 @@ import { DebtCharts } from './DebtCharts'
 import { DebtAccount, DebtsResponse, Term, totalPaidOff } from './types'
 import { Tooltip } from '@/components/Tooltip'
 import { BUDGET_ACCOUNTS, BudgetAccountIcon, budgetAccountLabel, type BudgetAccount } from '@/components/BudgetAccount'
+import { formatMoneyCents } from '@/lib/format'
 
 type Tab = 'short' | 'long' | 'paid'
 type SortKey = 'name' | 'category' | 'paidWith' | 'latest' | 'change' | 'latestDate' | 'term'
@@ -606,8 +607,8 @@ export function DebtsTable({ role }: { role: string }) {
           </ModalField>
         )}
         <ModalField label="Balance">
-          <input type="number" step="0.01" min="0" value={newRow.balance} placeholder="0.00"
-            onChange={(e) => setNewRow({ ...newRow, balance: e.target.value })} />
+          <input type="text" inputMode="numeric" value={newRow.balance} placeholder="0.00"
+            onChange={(e) => setNewRow({ ...newRow, balance: formatMoneyCents(e.target.value) })} />
         </ModalField>
         <ModalField label="Balance date">
           <input type="date" value={newRow.as_of}
