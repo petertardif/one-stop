@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Spinner } from '@/components/Spinner'
 import { RecordModal, ModalField } from '@/components/RecordModal'
 import { Tooltip } from '@/components/Tooltip'
+import { formatMoneyCents } from '@/lib/format'
 
 type Tab = 'active' | 'cancelled'
 type Cycle = 'monthly' | 'annual'
@@ -516,12 +517,12 @@ export function SubscriptionsTable({ role }: { role: string }) {
             onChange={(e) => setNewRow({ ...newRow, category: e.target.value.toUpperCase() })} />
         </ModalField>
         <ModalField label="Price / year">
-          <input type="number" step="0.01" min="0" value={newRow.priceYear} placeholder="0.00"
-            onChange={(e) => setNewRow({ ...newRow, priceYear: e.target.value })} />
+          <input type="text" inputMode="numeric" value={newRow.priceYear} placeholder="0.00"
+            onChange={(e) => setNewRow({ ...newRow, priceYear: formatMoneyCents(e.target.value) })} />
         </ModalField>
         <ModalField label="Price / month">
-          <input type="number" step="0.01" min="0" value={newRow.priceMonth} placeholder="0.00"
-            onChange={(e) => setNewRow({ ...newRow, priceMonth: e.target.value })} />
+          <input type="text" inputMode="numeric" value={newRow.priceMonth} placeholder="0.00"
+            onChange={(e) => setNewRow({ ...newRow, priceMonth: formatMoneyCents(e.target.value) })} />
         </ModalField>
         <ModalField label="Renewal cycle">
           <select value={newRow.renewalCycle}

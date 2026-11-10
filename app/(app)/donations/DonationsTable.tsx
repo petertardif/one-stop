@@ -7,6 +7,7 @@ import { Spinner } from '@/components/Spinner'
 import { RecordModal, ModalField } from '@/components/RecordModal'
 import { MultiSelect } from '@/components/MultiSelect'
 import { Tooltip } from '@/components/Tooltip'
+import { formatMoneyCents } from '@/lib/format'
 
 type SortKey =
   | 'date' | 'organization' | 'donor_name' | 'donor_contact'
@@ -416,8 +417,8 @@ export function DonationsTable({ role }: { role: string }) {
             onChange={(e) => setNewRow({ ...newRow, donorContact: e.target.value })} />
         </ModalField>
         <ModalField label="Donation amount">
-          <input type="number" step="0.01" min="0" value={newRow.amount} placeholder="0.00"
-            onChange={(e) => setNewRow({ ...newRow, amount: e.target.value })} />
+          <input type="text" inputMode="numeric" value={newRow.amount} placeholder="0.00"
+            onChange={(e) => setNewRow({ ...newRow, amount: formatMoneyCents(e.target.value) })} />
         </ModalField>
         <ModalField label="Payment method">
           <select value={newRow.paymentMethod}
@@ -427,8 +428,8 @@ export function DonationsTable({ role }: { role: string }) {
           </select>
         </ModalField>
         <ModalField label="Value of goods/services">
-          <input type="number" step="0.01" min="0" value={newRow.goodsValue} placeholder="0.00"
-            onChange={(e) => setNewRow({ ...newRow, goodsValue: e.target.value })} />
+          <input type="text" inputMode="numeric" value={newRow.goodsValue} placeholder="0.00"
+            onChange={(e) => setNewRow({ ...newRow, goodsValue: formatMoneyCents(e.target.value) })} />
         </ModalField>
         <ModalField label="Notes" full>
           <input value={newRow.notes} placeholder="Notes"
