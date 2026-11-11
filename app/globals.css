@@ -3441,9 +3441,14 @@ p, h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
 }
 
-.ledger-table tbody tr.draggable-row {
+.drag-handle {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-right: 4px;
   cursor: grab;
+  color: var(--text-muted);
 }
+.drag-handle:hover { color: var(--text-primary); }
 .ledger-table tbody tr.dragging {
   opacity: 0.5;
   cursor: grabbing;
@@ -3905,3 +3910,8 @@ p, h1, h2, h3, h4, h5, h6 {
 .cash-gauge__over { position: absolute; top: 0; bottom: 0; background: var(--color-negative); }
 .cash-gauge__income-mark { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--text-primary, #222); }
 .cash-gauge__labels { display: flex; justify-content: space-between; font-size: var(--font-size-sm); color: var(--text-secondary); }
+
+/* Shared Recharts legend (components/ChartLegend.tsx), trimmable on mobile. */
+.chart-legend { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 12px; margin: 0; padding: 0; list-style: none; }
+.chart-legend__item { display: flex; align-items: center; gap: 4px; }
+.chart-legend__more { color: var(--text-muted); cursor: default; }

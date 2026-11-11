@@ -7,6 +7,7 @@ import {
 } from 'recharts'
 import { Investment, latestValue } from './types'
 import { valueOnOrBefore } from '@/lib/snapshots'
+import { ChartLegendList, trimLegend, useIsMobile } from '@/components/ChartLegend'
 
 type Dimension = 'owner' | 'type'
 
@@ -72,6 +73,13 @@ export function InvestmentCharts({ rows }: { rows: Investment[] }) {
       .sort((a, b) => b.value - a.value)
   }, [rows, dimension])
 
+  // On mobile, more than 5 slices → legend lists the 5 largest + "+N more".
+  const isMobile = useIsMobile()
+  const allocLegend = useMemo(() => trimLegend(
+    allocation.map((x, i) => ({ key: x.name, label: x.name, color: COLORS[i % COLORS.length], size: x.value })),
+    { enabled: isMobile, max: 5, top: 5 },
+  ), [allocation, isMobile])
+
   // Label = brokerage, disambiguated with the type only when the brokerage name
   // is shared by more than one account (falls back to owner if type is blank).
   const brokerageCounts = useMemo(() => {
@@ -123,7 +131,7 @@ export function InvestmentCharts({ rows }: { rows: Investment[] }) {
                 {allocation.map((entry, i) => <Cell key={entry.name} fill={COLORS[i % COLORS.length]} />)}
               </Pie>
               <Tooltip formatter={(v) => fmtUsdFull(Number(v))} />
-              <Legend />
+              <Legend content={() => <ChartLegendList {...allocLegend} icon="square" />} />
             </PieChart>
           </ResponsiveContainer>
         </div>

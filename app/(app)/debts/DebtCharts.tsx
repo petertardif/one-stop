@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import {
   ResponsiveContainer, AreaChart, Area, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts'
 import { DebtAccount, latestBalance, totalPaidOff } from './types'
 import { valueOnOrBefore } from '@/lib/snapshots'
-import { Tooltip as HoverTip } from '@/components/Tooltip'
+import { ChartLegendList, trimLegend, useIsMobile } from '@/components/ChartLegend'
 
 type Dimension = 'category' | 'debt'
 
@@ -32,21 +32,8 @@ const fmtUsd = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDig
 // "+N more". Desktop always shows the full legend.
 const LEGEND_MAX_DEBTS = 5
 const LEGEND_TOP = 3
-
-// Same breakpoint as the app's mobile layout (hamburger nav) in globals.css.
-const MOBILE_QUERY = '(max-width: 768px)'
-
-function useIsMobile() {
-  const [mobile, setMobile] = useState(false)
-  useEffect(() => {
-    const mq = window.matchMedia(MOBILE_QUERY)
-    const update = () => setMobile(mq.matches)
-    update()
-    mq.addEventListener('change', update)
-    return () => mq.removeEventListener('change', update)
-  }, [])
-  return mobile
-}
+// Allocation donut on mobile: more than 5 slices → list the 5 largest + "+N more".
+const ALLOC_LEGEND_TOP = 5
 
 const fmtUsdFull = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -99,19 +86,13 @@ export function DebtCharts({ rows, paidTab = false }: { rows: DebtAccount[]; pai
   // Legend entries for the per-debt chart. Colors follow each line's index in
   // `series`, so they stay matched to the lines when the legend is trimmed.
   const isMobile = useIsMobile()
-  const legend = useMemo(() => {
-    const entries = series.map((g, i) => ({
+  const legend = useMemo(() => trimLegend(
+    series.map((g, i) => ({
       key: g.key, label: g.label, color: COLORS[i % COLORS.length],
       size: g.members.reduce((t, d) => t + (paidTab ? totalPaidOff(d) : latestBalance(d)), 0),
-    }))
-    if (!isMobile || rows.length <= LEGEND_MAX_DEBTS) return { shown: entries, hidden: [] as typeof entries }
-    const ranked = [...entries].sort((a, b) => b.size - a.size)
-    const top = new Set(ranked.slice(0, LEGEND_TOP).map((e) => e.key))
-    return {
-      shown: entries.filter((e) => top.has(e.key)),
-      hidden: ranked.slice(LEGEND_TOP),
-    }
-  }, [series, rows.length, paidTab, isMobile])
+    })),
+    { enabled: isMobile, max: LEGEND_MAX_DEBTS, top: LEGEND_TOP, count: rows.length },
+  ), [series, rows.length, paidTab, isMobile])
 
   // Per-series balance across the snapshot dates.
   const perDebtSeries = useMemo(
@@ -147,6 +128,10 @@ export function DebtCharts({ rows, paidTab = false }: { rows: DebtAccount[]; pai
       .filter((x) => x.value > 0)
       .sort((a, b) => b.value - a.value)
   }, [rows, dimension, paidTab])
+  const allocLegend = useMemo(() => trimLegend(
+    allocation.map((x, i) => ({ key: x.name, label: x.name, color: COLORS[i % COLORS.length], size: x.value })),
+    { enabled: isMobile, max: ALLOC_LEGEND_TOP, top: ALLOC_LEGEND_TOP },
+  ), [allocation, isMobile])
 
   if (rows.length === 0) return null
 
@@ -186,7 +171,7 @@ export function DebtCharts({ rows, paidTab = false }: { rows: DebtAccount[]; pai
                 {allocation.map((entry, i) => <Cell key={entry.name} fill={COLORS[i % COLORS.length]} />)}
               </Pie>
               <Tooltip formatter={(v) => fmtUsdFull(Number(v))} />
-              <Legend />
+              <Legend content={() => <ChartLegendList {...allocLegend} icon="square" />} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -202,25 +187,7 @@ export function DebtCharts({ rows, paidTab = false }: { rows: DebtAccount[]; pai
             <Tooltip formatter={(v) => fmtUsdFull(Number(v))} />
             <Legend
               wrapperStyle={{ fontSize: 11 }}
-              content={() => (
-                <ul style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '4px 12px', margin: 0, padding: 0, listStyle: 'none' }}>
-                  {legend.shown.map((e) => (
-                    <li key={e.key} style={{ display: 'flex', alignItems: 'center', gap: 4, color: e.color }}>
-                      <svg width={14} height={14} aria-hidden><line x1={0} y1={7} x2={14} y2={7} stroke={e.color} strokeWidth={2} /></svg>
-                      {e.label}
-                    </li>
-                  ))}
-                  {legend.hidden.length > 0 && (
-                    <li>
-                      <HoverTip text={legend.hidden.map((e) => e.label).join(', ')}>
-                        <span tabIndex={0} style={{ color: 'var(--text-muted, #6b7280)', cursor: 'default' }}>
-                          +{legend.hidden.length} more
-                        </span>
-                      </HoverTip>
-                    </li>
-                  )}
-                </ul>
-              )}
+              content={() => <ChartLegendList {...legend} icon="line" />}
             />
             {series.map((g, i) => (
               <Line
