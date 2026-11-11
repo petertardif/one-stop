@@ -10,6 +10,7 @@ import { Spinner } from '@/components/Spinner'
 import { InvestmentCharts } from './InvestmentCharts'
 import { Investment, InvestmentsResponse, Cadence } from './types'
 import { Tooltip } from '@/components/Tooltip'
+import { DragHandle, useDragHandle } from '@/components/DragHandle'
 
 type SortKey = 'brokerage' | 'type' | 'owner' | 'type_description' | 'contribution' | 'latest' | 'change'
 
@@ -55,6 +56,7 @@ export function InvestmentsTable({ role }: { role: string }) {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [search, setSearch] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
+  const { armedId, arm, disarm } = useDragHandle()
   const [tab, setTab] = useState<'active' | 'liquidated'>('active')
 
   // Add-snapshot-date modal
@@ -421,12 +423,13 @@ export function InvestmentsTable({ role }: { role: string }) {
                 <Fragment key={inv.id}>
                   <tr
                     className={[reorderable ? 'draggable-row' : '', dragId === inv.id ? 'dragging' : ''].filter(Boolean).join(' ') || undefined}
-                    draggable={reorderable}
+                    draggable={reorderable && armedId === inv.id}
                     onDragStart={reorderable ? () => setDragId(inv.id) : undefined}
                     onDragOver={reorderable ? (e) => e.preventDefault() : undefined}
                     onDrop={reorderable ? () => handleDrop(inv.id) : undefined}
-                    onDragEnd={reorderable ? () => setDragId(null) : undefined}>
+                    onDragEnd={reorderable ? () => { setDragId(null); disarm() } : undefined}>
                     <td className="col-center">
+                    {reorderable && <DragHandle onArm={() => arm(inv.id)} />}
                       {canWrite && <input type="checkbox" checked={selectedIds.has(inv.id)} onChange={() => toggleSelect(inv.id)} />}
                     </td>
                     <td className="col-center">

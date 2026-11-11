@@ -45,14 +45,14 @@ The primary landing page after login. An at-a-glance view **derived entirely fro
 - **Net-worth-over-time** line chart: the union of all investment + debt snapshot dates (last 12 months), each date's assets/liabilities computed by **carry-forward** (each account's latest snapshot on/before that date, via the shared `valueOnOrBefore` in `lib/snapshots.ts`), ending at today. Active accounts only (a liquidated/paid account drops out of the trend — a deliberate simplification).
 
 #### At-a-Glance tiles
-Compact tiles, each a link to its module: **This Week's 1k** (weekly remaining + spent → `/monthly`, via the shared `getWeeklyBudget` in `lib/weeklyBudget.ts`) · **Monthly Bills** (Budget Next-Monthly total + trailing-12-mo `monthly_average` → `/budget`) · **Subscriptions** (active /yr · /mo → `/subscriptions`) · **Auto Service** (cost YTD → `/auto`). (Portfolio/Total Debt are intentionally omitted — they'd duplicate the Net Worth assets/liabilities above.)
+Compact tiles (first section on the page), each a link to its module: **This Week's 1k** (weekly remaining + spent → `/monthly`, via the shared `getWeeklyBudget` in `lib/weeklyBudget.ts`) · **Short Term Debt** / **Long Term Debt** (active debts' remaining balance + amount *paid down* this calendar year — every balance drop across this year's snapshots, from the last pre-Jan-1 balance, plus a drop to $0 for debts marked paid this year; increases ignored → `/debts`) · **Monthly Bills** (Budget Next-Monthly total + trailing-12-mo `monthly_average` → `/budget`) · **Subscriptions** (active /yr · /mo → `/subscriptions`) · **Auto Service** (cost YTD → `/auto`). (Portfolio/Total Debt are intentionally omitted — they'd duplicate the Net Worth assets/liabilities above.)
 
 #### Monthly Cash Flow
-- Income vs. expenses for the current month (from `transactions`), with a simple bar chart. (Transactions are entered in the Ledger.)
+- Current month from `transactions`: **Income = rows categorized `INCOME`**; **Expenses = all `type='expense'` rows**. Shown as a **spending gauge** — headline Saved/Overspent $X (% of income), a bar where expenses fill against income (green up to income, red overflow past an income tick mark).
 
 **Removed (pending Plaid):** the manual **Accounts Panel**, the **Debt Snapshot** table (superseded by the Debts module), the `accounts`-based net-worth math, and the per-load `net_worth_snapshots` write. The `accounts` table, `/dashboard/accounts/*` pages, `AccountForm`, `/api/accounts*`, and all Plaid code remain in the codebase (untouched) for the future Plaid + account-setup flow, but are no longer surfaced on the dashboard.
 
-`GET /api/dashboard?tz=IANA` returns `{ netWorth {assets,liabilities,netWorth}, netWorthHistory [{date,assets,liabilities,netWorth}], cashFlow {income,expenses}, weekly {week_start,remaining,spent}, monthlyBills {nextMonthly,monthlyAverage}, subscriptions {perYear,perMonth}, auto {ytd} }`.
+`GET /api/dashboard?tz=IANA` returns `{ netWorth {assets,liabilities,netWorth}, netWorthHistory [{date,assets,liabilities,netWorth}], cashFlow {income,expenses}, weekly {week_start,remaining,spent}, monthlyBills {nextMonthly,monthlyAverage}, subscriptions {perYear,perMonth}, auto {ytd}, debtTerms {short,long: {remaining,paidThisYear}} }`.
 
 **Plaid Integration (future, not yet surfaced):**
 - "Connect to bank" flow using Plaid Link widget; access tokens stored server-side (never exposed to client); manual "sync now" refreshes balances. Re-surface the Accounts Panel + Sync once this exists.
@@ -168,7 +168,7 @@ A table of recurring budget line items (bills), under the Financials sidebar gro
 
 **Sorting / reordering / filtering:**
 - **Column sort** — click any data-column header (Description, Category, Due Date, Auto/Manual, Duration, Annual, Next Monthly) to sort asc → desc → back to manual order. Monthly Average (aggregate-only), the checkbox, and Actions are not sortable.
-- **Drag-to-reorder** — rows have a persisted manual order (`budget_items.sort_order`); drag a row to a new position to save it (`/api/budget-items/reorder`, optimistic). Enabled only in manual order with no active search/category filter/column sort.
+- **Drag-to-reorder** (by the row's grip handle; text stays selectable) — rows have a persisted manual order (`budget_items.sort_order`); drag a row by its grip to a new position to save it (`/api/budget-items/reorder`, optimistic). Enabled only in manual order with no active search/category filter/column sort.
 - **Search** — text box next to the Archived tab; filters by description or category.
 - **Category filter** — dropdown next to search; filters to a single category. Totals reflect the visible (filtered) rows.
 
@@ -192,6 +192,7 @@ A standalone debts tracker under the Financials sidebar group — **independent*
 **Charts (top of page, reflect the active tab's debts):**
 - **Total debt over time** (area) — for each snapshot date, sums every debt's **carry-forward** balance (its most recent snapshot on or before that date), so a debt you didn't update that day still counts at its last known balance. A debt contributes $0 to dates before its first snapshot.
 - **Allocation** (donut) — latest balance per debt, grouped by a **Category / Debt** toggle.
+- **Mobile legends** (≤768px, shared `components/ChartLegend.tsx`): Allocation with >5 slices lists the 5 largest + "+N more" (hover lists the rest); Per-debt with >5 debts lists the 3 largest by current balance (Paid Off: total paid off) + "+N more". All lines/slices still drawn. Investments' Allocation donut uses the same >5 → top 5 rule.
 - **Per-debt balance over time** (multi-line) — one line per debt across snapshot dates, each debt **carried forward** from its last snapshot (line stays flat until its next update; no line before its first snapshot). Legend shows the debt name, disambiguated with its category only when a name is shared.
 
 On the **Paid Off** tab both of these roll every short-term debt into a single **Short Term** series/slice (they are dozens of one-off line items), leaving long-term debts individual. Allocation there also measures each debt by its **Total Paid Off** (peak balance) rather than its latest balance, which is 0 for a paid-off debt.
@@ -202,7 +203,7 @@ On the **Paid Off** tab both of these roll every short-term debt into a single *
 - **Paid With** — which household account the debt is paid from, mirroring the ledger's **Budget** column: **N/A** (null) · **Bank** · **Chase CC** · **BoA CC**, sharing its options and read-view icons (`components/BudgetAccount.tsx` — landmark for Bank, Chase-blue card, BoA-red card, each with a "Paid with …" tooltip; N/A renders nothing). Editable inline (select) and offered in the **New Debt** modal, defaulting to **N/A**. Sortable by label; not part of the search box. Shown on the **Short Term** and **Paid Off** tabs only — **Long Term** debts don't carry one, so the field disappears from the modal when Term is Long and the value is cleared server-side whenever a debt's term is `long`. A long-term debt therefore always reads N/A once marked paid.
 - Inline click-to-edit rows (name / category / term). `New Debt` opens a **modal** (Name · Category · Term · Balance · Balance date) whose **term is auto-set to the active tab** and whose **date defaults to today**; the balance is saved as the debt's **first snapshot** in the same transaction as the account. Save is disabled until a name is entered; leaving the balance blank creates the debt with no snapshots.
 - **Balance history** — expand a row to see all dated balances (admin can inline-edit a value or delete a snapshot). **Add snapshot date** (modal): pick a date, enter each debt's balance in one pass (upserts).
-- **Search / column sort / drag-reorder** (same controls as Investments, next to the tabs). Sorting any data column is view-only. **Drag-reorder** (Short/Long tabs, when unsorted/unsearched) persists a manual order via `debt_accounts.sort_order`.
+- **Search / column sort / drag-reorder** (same controls as Investments, next to the tabs). Sorting any data column is view-only. **Drag-reorder** (by the row's grip handle; text stays selectable) (Short/Long tabs, when unsorted/unsearched) persists a manual order via `debt_accounts.sort_order`.
 - **Totals footer** sums Latest Balance across the visible rows.
 
 **Toolbar** — Short/Long: `New Debt`, `Add snapshot date`, `Mark as Paid`, `Delete`. Paid Off: `Restore`, `Delete` (checkbox-driven; per-row actions also available).
@@ -232,7 +233,7 @@ A subscriptions ledger under the Financials sidebar group, mirroring the Debts p
 - **Renewal** is structured via a cycle picker: **Monthly** → day-of-month (renders "Monthly - 1st"); **Annual** → a specific date.
 - **Category** — free-form (predefined: ENTERTAINMENT, STORAGE, FITNESS, FINANCIAL, GROCERIES, SUBSCRIPTION, TECHNOLOGY, OTHER + user-typed). Technology subs are just Category = TECHNOLOGY.
 - Inline click-to-edit rows; **Add** opens a modal (Service · Company · Category · Price/Year · Price/Month · Renewal cycle · Renewal day/date); Save is disabled until a service is entered.
-- **Search / column sort / drag-reorder / category filter** (same controls as Budget, next to the tabs). Sorting any data column is view-only. **Drag-reorder** (Active tab only, when unsorted/unfiltered) persists a manual order via `subscriptions.sort_order` (`/api/subscriptions/reorder`).
+- **Search / column sort / drag-reorder / category filter** (same controls as Budget, next to the tabs). Sorting any data column is view-only. **Drag-reorder** (by the row's grip handle; text stays selectable) (Active tab only, when unsorted/unfiltered) persists a manual order via `subscriptions.sort_order` (`/api/subscriptions/reorder`).
 - **Totals footer** sums Price/Year and Price/Month across the visible rows.
 
 **Toolbar** — Active: `Add`, `Mark as Cancelled`, `Duplicate`. Cancelled: `Restore`, `Delete` (checkbox-driven; Mark as Cancelled / Restore / Delete also available per-row). Duplicate copies active rows as new active rows (`Copy of: ` service prefix).
@@ -259,7 +260,7 @@ A vehicle service/maintenance log under the Financials sidebar group. Admin read
 **Columns:** select checkbox · Date · Car · Service Description · Cost · Service Performed by · Actions.
 
 - Every column except Actions is **sortable** (click header; asc → desc → back to manual order).
-- **Drag-to-reorder** rows (persisted via `sort_order`), available only when no sort/search/filter is active.
+- **Drag-to-reorder** (by the row's grip handle; text stays selectable) rows (persisted via `sort_order`), available only when no sort/search/filter is active.
 - **Totals footer** sums Cost across the visible rows.
 - Inline click-to-edit rows (save/cancel icons); **Add** opens a modal (Date · Car · Service description · Cost · Service performed by); Save is disabled until a car and date are entered.
 

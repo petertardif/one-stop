@@ -13,6 +13,7 @@ import { DebtAccount, DebtsResponse, Term, totalPaidOff } from './types'
 import { Tooltip } from '@/components/Tooltip'
 import { BUDGET_ACCOUNTS, BudgetAccountIcon, budgetAccountLabel, type BudgetAccount } from '@/components/BudgetAccount'
 import { formatMoneyCents } from '@/lib/format'
+import { DragHandle, useDragHandle } from '@/components/DragHandle'
 
 type Tab = 'short' | 'long' | 'paid'
 type SortKey = 'name' | 'category' | 'paidWith' | 'latest' | 'change' | 'latestDate' | 'term'
@@ -61,6 +62,7 @@ export function DebtsTable({ role }: { role: string }) {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [search, setSearch] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
+  const { armedId, arm, disarm } = useDragHandle()
 
   // New-debt + add-snapshot-date modals
   const newDialogRef = useRef<HTMLDialogElement>(null)
@@ -445,12 +447,13 @@ export function DebtsTable({ role }: { role: string }) {
                 <Fragment key={d.id}>
                   <tr
                     className={[reorderable ? 'draggable-row' : '', dragId === d.id ? 'dragging' : ''].filter(Boolean).join(' ') || undefined}
-                    draggable={reorderable}
+                    draggable={reorderable && armedId === d.id}
                     onDragStart={reorderable ? () => setDragId(d.id) : undefined}
                     onDragOver={reorderable ? (e) => e.preventDefault() : undefined}
                     onDrop={reorderable ? () => handleDrop(d.id) : undefined}
-                    onDragEnd={reorderable ? () => setDragId(null) : undefined}>
+                    onDragEnd={reorderable ? () => { setDragId(null); disarm() } : undefined}>
                     <td className="col-center">
+                    {reorderable && <DragHandle onArm={() => arm(d.id)} />}
                       {canWrite && <input type="checkbox" checked={selectedIds.has(d.id)} onChange={() => toggleSelect(d.id)} />}
                     </td>
                     <td className="col-center">

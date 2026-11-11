@@ -7,6 +7,7 @@ import { Spinner } from '@/components/Spinner'
 import { RecordModal, ModalField } from '@/components/RecordModal'
 import { Tooltip } from '@/components/Tooltip'
 import { formatMoneyCents } from '@/lib/format'
+import { DragHandle, useDragHandle } from '@/components/DragHandle'
 
 type Tab = 'active' | 'cancelled'
 type Cycle = 'monthly' | 'annual'
@@ -86,6 +87,7 @@ export function SubscriptionsTable({ role }: { role: string }) {
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
+  const { armedId, arm, disarm } = useDragHandle()
 
   const { data, isLoading } = useQuery<SubscriptionsResponse>({
     queryKey: ['subscriptions', tab],
@@ -436,13 +438,14 @@ export function SubscriptionsTable({ role }: { role: string }) {
                 <tr
                   key={s.id}
                   className={[reorderable ? 'draggable-row' : '', dragId === s.id ? 'dragging' : ''].filter(Boolean).join(' ') || undefined}
-                  draggable={reorderable}
+                  draggable={reorderable && armedId === s.id}
                   onDragStart={reorderable ? () => setDragId(s.id) : undefined}
                   onDragOver={reorderable ? (e) => e.preventDefault() : undefined}
                   onDrop={reorderable ? () => handleDrop(s.id) : undefined}
-                  onDragEnd={reorderable ? () => setDragId(null) : undefined}
+                  onDragEnd={reorderable ? () => { setDragId(null); disarm() } : undefined}
                 >
                   <td className="col-center">
+                    {reorderable && <DragHandle onArm={() => arm(s.id)} />}
                     {canWrite && <input type="checkbox" checked={selectedIds.has(s.id)} onChange={() => toggleSelect(s.id)} />}
                   </td>
                   <td>{s.category ?? ''}</td>

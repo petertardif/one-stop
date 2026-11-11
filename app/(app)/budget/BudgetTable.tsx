@@ -7,6 +7,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Spinner } from '@/components/Spinner'
 import { RecordModal, ModalField } from '@/components/RecordModal'
 import { Tooltip } from '@/components/Tooltip'
+import { formatMoneyCents } from '@/lib/format'
+import { DragHandle, useDragHandle } from '@/components/DragHandle'
 
 type Duration = 'annual' | 'monthly' | 'biweekly' | 'weekly'
 type PayType = 'autopay' | 'manual'
@@ -119,6 +121,7 @@ export function BudgetTable({ role }: { role: string }) {
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
+  const { armedId, arm, disarm } = useDragHandle()
 
   const { data, isLoading } = useQuery<BudgetResponse>({
     queryKey: ['budget-items', view],
@@ -476,13 +479,14 @@ export function BudgetTable({ role }: { role: string }) {
                 <tr
                   key={item.id}
                   className={[reorderable ? 'draggable-row' : '', dragId === item.id ? 'dragging' : ''].filter(Boolean).join(' ') || undefined}
-                  draggable={reorderable}
+                  draggable={reorderable && armedId === item.id}
                   onDragStart={reorderable ? () => setDragId(item.id) : undefined}
                   onDragOver={reorderable ? (e) => e.preventDefault() : undefined}
                   onDrop={reorderable ? () => handleDrop(item.id) : undefined}
-                  onDragEnd={reorderable ? () => setDragId(null) : undefined}
+                  onDragEnd={reorderable ? () => { setDragId(null); disarm() } : undefined}
                 >
                   <td className="col-center">
+                    {reorderable && <DragHandle onArm={() => arm(item.id)} />}
                     {view === 'active' && canWrite && (
                       <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
                     )}
@@ -573,8 +577,8 @@ export function BudgetTable({ role }: { role: string }) {
           </select>
         </ModalField>
         <ModalField label="Price">
-          <input type="number" step="0.01" min="0" value={newRow.amount} placeholder="0.00"
-            onChange={(e) => setNewRow({ ...newRow, amount: e.target.value })} />
+          <input type="text" inputMode="numeric" value={newRow.amount} placeholder="0.00"
+            onChange={(e) => setNewRow({ ...newRow, amount: formatMoneyCents(e.target.value) })} />
         </ModalField>
         <ModalField label="Next monthly">
           <input value={money(nextMonthlyOf(parseFloat(newRow.amount) || 0, newRow.duration))} readOnly tabIndex={-1} />

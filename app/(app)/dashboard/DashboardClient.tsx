@@ -93,6 +93,11 @@ export function DashboardClient({ firstName }: { firstName: string }) {
       <section className="dashboard__section">
         <h2 className="dashboard__section-title">At a Glance</h2>
         <div className="dashboard__tiles">
+          <Link href="/monthly" className="dashboard-tile">
+            <span className="dashboard-tile__label"><CalendarClock size={16} /> This Week&apos;s 1k</span>
+            <span className={`dashboard-tile__value ${weekly.remaining < 0 ? 'negative' : ''}`}>{fmt(weekly.remaining)}</span>
+            <span className="dashboard-tile__sub">{fmt(weekly.spent)} spent</span>
+          </Link>
           <Link href="/debts" className="dashboard-tile">
             <span className="dashboard-tile__label"><CreditCard size={16} /> Short Term Debt</span>
             <span className="dashboard-tile__value">{fmt(debtTerms.short.remaining)}</span>
@@ -102,11 +107,6 @@ export function DashboardClient({ firstName }: { firstName: string }) {
             <span className="dashboard-tile__label"><Landmark size={16} /> Long Term Debt</span>
             <span className="dashboard-tile__value">{fmt(debtTerms.long.remaining)}</span>
             <span className="dashboard-tile__sub">{fmt(debtTerms.long.paidThisYear)} paid down in {thisYear}</span>
-          </Link>
-          <Link href="/monthly" className="dashboard-tile">
-            <span className="dashboard-tile__label"><CalendarClock size={16} /> This Week&apos;s 1k</span>
-            <span className={`dashboard-tile__value ${weekly.remaining < 0 ? 'negative' : ''}`}>{fmt(weekly.remaining)}</span>
-            <span className="dashboard-tile__sub">{fmt(weekly.spent)} spent</span>
           </Link>
           <Link href="/budget" className="dashboard-tile">
             <span className="dashboard-tile__label"><Receipt size={16} /> Monthly Bills</span>
