@@ -347,7 +347,7 @@ For a given stock ticker, display and calculate the 5 key growth rates over 1, 5
 5. **Return on Invested Capital (ROIC)**
 
 - Input: stock ticker symbol
-- Data source: financial data API (e.g., Financial Modeling Prep or Alpha Vantage) fetched via server-side API route
+- Data source: **SEC EDGAR** annual 10-K data (`data.sec.gov` XBRL companyfacts, free, ~2009+) via `lib/sec.ts`, normalized to one row per fiscal year and cached in `sec_annual_financials` (refetched when >30 days old, or on **Refresh from SEC**). Tag fallbacks per metric; comparative-year duplicates collapse to the latest filing; EPS/share counts are **split-adjusted** onto today's share basis. US filers only — others get "No SEC data … (US filers only)". Metrics: Sales = revenue · EPS = diluted EPS · Equity = equity ÷ shares · FCF = operating cash flow − capex · ROIC = operating income × (1 − tax rate) ÷ (equity + debt − cash). Growth compares fiscal years by year (not row position). FMP's free `/stable` plan (`lib/fmp.ts`) supplies only name/sector/price, analyst EPS estimates (analyst growth = CAGR from latest EPS to the furthest estimate) and daily price history. The page shows "Financials: SEC EDGAR · FY… · updated …".
 - Output: table of rates + pass/fail indicator (Rule #1 benchmark: all 5 ≥ 10%, ROIC ≥ 10%)
 - "Add to Watchlist" button saves the analysis
 
@@ -504,6 +504,8 @@ subscriptions       id, user_id (FK), category (text, nullable — free-form), s
 auto_services       id, user_id (FK), date, car, description (nullable), cost (numeric, positive), performed_by (nullable), sort_order (int — persisted manual drag order), created_at, updated_at
 charitable_donations id, user_id (FK), date, organization (nullable — recipient charity), donor_name (nullable), donor_contact (nullable), amount (numeric, positive), payment_method (cash|non_cash), goods_services_value (numeric, nullable — quid-pro-quo value received), notes (nullable), sort_order (int — default order), created_at, updated_at
 investments         id, user_id (FK), brokerage, type (nullable — Retirement|College|Savings, free-form), owner (nullable — "in whose name"), type_description (nullable), contribution_cadence (none|weekly|biweekly|monthly|annual), contribution_amount (numeric, nullable), contribution_note (nullable), strategy (nullable), sort_order (int — persisted manual drag order), liquidated_at (nullable — set = Liquidated tab), created_at, updated_at
+sec_companies       ticker (PK), cik (10-digit), name, fetched_at — cached SEC ticker→CIK map
+sec_annual_financials cik, fiscal_year, period_end, revenue, eps_diluted, equity, shares_outstanding, operating_cash_flow, capex, operating_income, income_tax, pretax_income, long_term_debt, short_term_debt, cash, accession, fetched_at — PK (cik, fiscal_year)
 investment_snapshots id, investment_id (FK, cascade), as_of (date), value (numeric), created_at, updated_at — UNIQUE (investment_id, as_of)
 stocks              id, ticker, company_name, sector, created_at, updated_at
 watchlist_entries   id, user_id (FK), stock_id (FK), sticker_price, mos_price, growth_rate_used, big5_data (jsonb), added_at, updated_at
@@ -561,7 +563,8 @@ contacts            id, name, role, firm, phone, email, notes, created_at, updat
 |---------|---------|-------|
 | **Plaid** | Bank account sync | Server-side only; access tokens never sent to client |
 | **Avatar storage** | User profile photos | Stored on disk at `public/uploads/avatars/{userId}.ext`; path saved in `user_profiles.avatar_url`. To survive server migrations, move to object storage (S3 or Cloudflare R2): upload files to the bucket, store the public bucket URL in `avatar_url`, and remove the local `/api/profile/avatar` disk-write logic. |
-| **Financial Modeling Prep** (or Alpha Vantage) | Stock financial data for Big 5 calculator + OHLC price history for technical indicators | Free tier sufficient for personal use |
+| **SEC EDGAR** | Annual financials for the Big 5 calculator | Free, no key; `SEC_CONTACT_EMAIL` env var required for the User-Agent; ≤10 req/s |
+| **Financial Modeling Prep** | Profile/price, analyst EPS estimates, OHLC history for technical indicators | Free plan, `/stable` endpoints only (legacy `/api/v3` closed to keys after Aug 31 2025; free statements cap at 5 years) |
 | **Recharts** | Client-side chart rendering for MACD, Stochastic, and 10-day MA charts | React-native, TypeScript-friendly |
 | **NextAuth.js** | Authentication & session management | Credentials provider + JWT strategy |
 

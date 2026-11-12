@@ -75,6 +75,10 @@ Required variables:
 | `SMTP_PORT` | SMTP port (default: 587) |
 | `SMTP_USER` | SMTP username |
 | `SMTP_PASS` | SMTP password |
+| `FMP_API_KEY` | Financial Modeling Prep key (free plan). Used only for company profile/price, analyst EPS estimates and daily price history, via the `/stable` endpoints. Keys created after Aug 31 2025 can't use the legacy `/api/v3` endpoints. |
+| `SEC_CONTACT_EMAIL` | Contact email sent in the User-Agent header on SEC EDGAR requests, which the SEC requires. The Big 5 calculator's financials come from EDGAR (`lib/sec.ts`) and are cached for 30 days in `sec_annual_financials` (migration `036_sec_financials.sql`). US filers only. |
+
+Set both in Netlify's environment variables as well.
 
 For local email testing, use [Ethereal](https://ethereal.email) — create a free account and paste the SMTP credentials. Sent emails won't leave Ethereal; a preview URL is logged to the console.
 
