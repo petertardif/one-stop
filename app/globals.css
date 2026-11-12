@@ -3915,3 +3915,5 @@ p, h1, h2, h3, h4, h5, h6 {
 .chart-legend { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 12px; margin: 0; padding: 0; list-style: none; }
 .chart-legend__item { display: flex; align-items: center; gap: 4px; }
 .chart-legend__more { color: var(--text-muted); cursor: default; }
+
+.calculator__source { margin-top: 6px; font-size: var(--font-size-sm); color: var(--text-muted); }

@@ -153,6 +153,8 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
   const [refreshError, setRefreshError] = useState<string | null>(null)
+  // Where the Big 5 numbers came from, e.g. "SEC EDGAR · FY2026 · updated Nov 11, 2026".
+  const [sourceNote, setSourceNote] = useState<string | null>(null)
   const [livePrice, setLivePrice] = useState<number | null>(null)
   const [priceFetchFailed, setPriceFetchFailed] = useState(false)
   const [manualPriceInput, setManualPriceInput] = useState('')
@@ -185,6 +187,7 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
     setSaveError(null)
     setApiError(null)
     setRefreshError(null)
+    setSourceNote(null)
     setIsEditing(false)
     setLivePrice(null)
     setPriceFetchFailed(false)
@@ -242,7 +245,7 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
       }
     }
 
-    const fmpRes = await fetch(`/api/investing/fmp/${t}?data=big5`)
+    const fmpRes = await fetch(`/api/investing/fmp/${t}?data=big5${skipDbCheck ? '&refresh=1' : ''}`)
     if (fmpRes.ok) {
       const json = await fmpRes.json()
       setDisplayData({
@@ -258,6 +261,10 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
         effectiveGrowthRate: json.effectiveGrowthRate,
         analystGrowthRate: json.analystGrowthRate,
       })
+      if (json.source) {
+        const updated = json.fetchedAt ? new Date(json.fetchedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null
+        setSourceNote([json.source, json.latestFiscalYear && `FY${json.latestFiscalYear}`, updated && `updated ${updated}`].filter(Boolean).join(' · '))
+      }
       setStatus(skipDbCheck ? 'api-refresh-success' : 'api-success')
       return
     }
@@ -523,7 +530,7 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
                   <Pencil size={13} /> Edit
                 </button>
                 <button className="btn-secondary btn-sm" onClick={() => analyze(ticker, { skipDbCheck: true })}>
-                  <RefreshCw size={13} /> Refresh from API
+                  <RefreshCw size={13} /> Refresh from SEC
                 </button>
               </>
             )}
@@ -580,6 +587,7 @@ export function CalculatorClient({ isAdmin }: { isAdmin: boolean }) {
           <section>
             <h3 className="section-label">Big 5 Growth Numbers</h3>
             <Big5Table data={activeData} />
+            {sourceNote && <p className="calculator__source">Financials: {sourceNote}</p>}
           </section>
 
           <section>

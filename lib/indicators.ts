@@ -1,10 +1,5 @@
-import type {
-  FmpIncomeStatement,
-  FmpBalanceSheet,
-  FmpCashFlow,
-  FmpKeyMetrics,
-  FmpOhlc,
-} from './fmp'
+import type { FmpOhlc } from './fmp'
+import type { SecAnnual } from './sec'
 
 export interface GrowthRates {
   y1: number | null
@@ -47,44 +42,70 @@ export function cagr(latest: number, oldest: number, years: number): number | nu
   return Math.pow(latest / oldest, 1 / years) - 1
 }
 
-function growthRates(values: number[]): GrowthRates {
-  // values[0] = newest, values[n-1] = oldest
-  const latest = values[0]
-  return {
-    y1: values.length > 1 ? cagr(latest, values[1], 1) : null,
-    y5: values.length > 5 ? cagr(latest, values[5], 5) : null,
-    y10: values.length > 10 ? cagr(latest, values[10], 10) : null,
+// Rows are SEC annual rows, newest first. Values are looked up by fiscal year,
+// so a missing year never shifts the 1/5/10-year comparison onto the wrong row.
+type Annual = Pick<SecAnnual, 'fiscal_year'>
+
+function growthRates<T extends Annual>(rows: T[], value: (r: T) => number | null): GrowthRates {
+  const latest = rows.find((r) => value(r) != null)
+  if (!latest) return { y1: null, y5: null, y10: null }
+  const v = value(latest) as number
+  const at = (years: number) => {
+    const r = rows.find((x) => x.fiscal_year === latest.fiscal_year - years)
+    const old = r ? value(r) : null
+    return old == null ? null : cagr(v, old, years)
   }
+  return { y1: at(1), y5: at(5), y10: at(10) }
 }
 
 // --- Big 5 ---
 
-export function salesGrowth(statements: FmpIncomeStatement[]): GrowthRates {
-  return growthRates(statements.map((s) => s.revenue))
+export function salesGrowth(rows: SecAnnual[]): GrowthRates {
+  return growthRates(rows, (r) => r.revenue)
 }
 
-export function epsGrowth(statements: FmpIncomeStatement[]): GrowthRates {
-  return growthRates(statements.map((s) => s.eps))
+export function epsGrowth(rows: SecAnnual[]): GrowthRates {
+  return growthRates(rows, (r) => r.eps_diluted)
 }
 
-export function equityGrowth(sheets: FmpBalanceSheet[]): GrowthRates {
-  return growthRates(sheets.map((s) => s.bookValuePerShare))
+/** Equity (book value) per share. */
+export function equityGrowth(rows: SecAnnual[]): GrowthRates {
+  return growthRates(rows, (r) =>
+    r.equity != null && r.shares_outstanding ? r.equity / r.shares_outstanding : null)
 }
 
-export function fcfGrowth(flows: FmpCashFlow[]): GrowthRates {
-  return growthRates(flows.map((f) => f.freeCashFlow))
+/** Free cash flow = operating cash flow − capital expenditures. */
+export function fcfGrowth(rows: SecAnnual[]): GrowthRates {
+  return growthRates(rows, (r) =>
+    r.operating_cash_flow != null ? r.operating_cash_flow - (r.capex ?? 0) : null)
 }
 
-export function roicRates(metrics: FmpKeyMetrics[]): GrowthRates {
-  function avg(slice: FmpKeyMetrics[]): number | null {
-    const vals = slice.map((m) => m.roic).filter((v): v is number => v !== null)
-    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null
+/**
+ * ROIC = NOPAT / invested capital, where NOPAT = operating income × (1 − tax
+ * rate) and invested capital = equity + debt − cash. Tax rate = income tax ÷
+ * pretax income, clamped to 0–50%, defaulting to 21% when unavailable.
+ */
+export function roicOf(r: SecAnnual): number | null {
+  if (r.operating_income == null || r.equity == null) return null
+  let tax = 0.21
+  if (r.income_tax != null && r.pretax_income) tax = Math.min(0.5, Math.max(0, r.income_tax / r.pretax_income))
+  const invested = r.equity + (r.long_term_debt ?? 0) + (r.short_term_debt ?? 0) - (r.cash ?? 0)
+  if (invested <= 0) return null
+  return (r.operating_income * (1 - tax)) / invested
+}
+
+/** ROIC: latest year, then the average over the last 5 and 10 fiscal years. */
+export function roicRates(rows: SecAnnual[]): GrowthRates {
+  const latest = rows[0]
+  if (!latest) return { y1: null, y5: null, y10: null }
+  const avg = (years: number) => {
+    const vals = rows
+      .filter((r) => r.fiscal_year > latest.fiscal_year - years)
+      .map(roicOf)
+      .filter((v): v is number => v != null)
+    return vals.length >= years ? vals.reduce((a, b) => a + b, 0) / vals.length : null
   }
-  return {
-    y1: metrics[0]?.roic ?? null,
-    y5: metrics.length >= 5 ? avg(metrics.slice(0, 5)) : null,
-    y10: metrics.length >= 10 ? avg(metrics.slice(0, 10)) : null,
-  }
+  return { y1: roicOf(latest), y5: avg(5), y10: avg(10) }
 }
 
 export function effectiveGrowthRate(
