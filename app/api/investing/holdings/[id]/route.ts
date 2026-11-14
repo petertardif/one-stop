@@ -19,10 +19,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   const result = await query(
     `UPDATE holding_lots
-     SET ticker = $3, company_name = $4, shares = $5, price = $6, bought_on = $7, notes = $8, updated_at = NOW()
+     SET ticker = $3, company_name = $4, shares = $5, price = $6, fee = $9, bought_on = $7, notes = $8, updated_at = NOW()
      WHERE id = $1 AND user_id = $2
      RETURNING ${LOT_COLUMNS}`,
-    [params.id, session.user.id, d.ticker, d.company_name, d.shares, d.price, d.bought_on, d.notes ?? null]
+    [params.id, session.user.id, d.ticker, d.company_name, d.shares, d.price, d.bought_on, d.notes ?? null, d.fee]
   )
   if (result.rowCount === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json(result.rows[0])

@@ -23,7 +23,7 @@ function today() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-const empty = () => ({ ticker: '', company_name: '', shares: '', price: '', bought_on: today(), notes: '' })
+const empty = () => ({ ticker: '', company_name: '', shares: '', price: '', fee: '', bought_on: today(), notes: '' })
 
 export function AddLotModal({ dialogRef, prefill, onSaved }: AddLotModalProps) {
   const queryClient = useQueryClient()
@@ -57,6 +57,7 @@ export function AddLotModal({ dialogRef, prefill, onSaved }: AddLotModalProps) {
           company_name: form.company_name.trim() || ticker,
           shares: form.shares,
           price: form.price,
+          fee: form.fee || 0,
           bought_on: form.bought_on,
           notes: form.notes.trim() || null,
           from_watchlist: Boolean(prefill),
@@ -103,6 +104,10 @@ export function AddLotModal({ dialogRef, prefill, onSaved }: AddLotModalProps) {
       <ModalField label="Price / share">
         <input type="text" inputMode="numeric" placeholder="0.00" value={form.price}
           onChange={(e) => setForm({ ...form, price: formatMoneyCents(e.target.value) })} />
+      </ModalField>
+      <ModalField label="Fee">
+        <input type="text" inputMode="numeric" placeholder="0.00" value={form.fee}
+          onChange={(e) => setForm({ ...form, fee: formatMoneyCents(e.target.value) })} />
       </ModalField>
       <ModalField label="Date bought">
         <input type="date" value={form.bought_on}

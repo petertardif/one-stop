@@ -38,10 +38,10 @@ export async function POST(req: NextRequest) {
   try {
     await client.query('BEGIN')
     const ins = await client.query(
-      `INSERT INTO holding_lots (user_id, ticker, company_name, shares, price, bought_on, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO holding_lots (user_id, ticker, company_name, shares, price, fee, bought_on, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING ${LOT_COLUMNS}`,
-      [session.user.id, d.ticker, d.company_name, d.shares, d.price, d.bought_on, d.notes ?? null]
+      [session.user.id, d.ticker, d.company_name, d.shares, d.price, d.fee, d.bought_on, d.notes ?? null]
     )
     if (fromWatchlist) {
       await client.query(

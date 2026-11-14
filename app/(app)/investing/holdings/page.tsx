@@ -7,9 +7,5 @@ export default async function HoldingsPage() {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
 
-  return (
-    <div className="page-container page-container--wide">
-      <HoldingsClient canWrite={session.user.role === 'admin'} />
-    </div>
-  )
+  return <HoldingsClient canWrite={session.user.role === 'admin'} />
 }

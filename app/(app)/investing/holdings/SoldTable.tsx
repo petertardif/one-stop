@@ -32,7 +32,7 @@ export function SoldTable({ canWrite }: { canWrite: boolean }) {
 
   const rows = lots.map((lot) => {
     const shares = parseFloat(lot.shares)
-    const cost = shares * parseFloat(lot.price)
+    const cost = shares * parseFloat(lot.price) + parseFloat(lot.fee)
     const proceeds = shares * parseFloat(lot.sale_price ?? '0')
     return { lot, shares, cost, proceeds, gain: proceeds - cost }
   })

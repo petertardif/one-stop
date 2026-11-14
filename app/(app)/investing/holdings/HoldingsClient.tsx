@@ -30,7 +30,7 @@ function groupLots(lots: HoldingLot[]): Position[] {
     const p = map.get(lot.ticker) ?? { ticker: lot.ticker, company_name: lot.company_name, lots: [], shares: 0, cost: 0 }
     p.lots.push(lot)
     p.shares += num(lot.shares)
-    p.cost += num(lot.shares) * num(lot.price)
+    p.cost += num(lot.shares) * num(lot.price) + num(lot.fee)
     map.set(lot.ticker, p)
   }
   return Array.from(map.values()).sort((a, b) => a.ticker.localeCompare(b.ticker))
@@ -50,7 +50,7 @@ export function HoldingsClient({ canWrite }: { canWrite: boolean }) {
   const [sellTarget, setSellTarget] = useState<SellTarget | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [editId, setEditId] = useState<string | null>(null)
-  const [edit, setEdit] = useState({ shares: '', price: '', bought_on: '', notes: '' })
+  const [edit, setEdit] = useState({ shares: '', price: '', fee: '', bought_on: '', notes: '' })
 
   const { data: lots = [], isLoading } = useQuery({
     queryKey: ['holdings', 'open'],
@@ -73,7 +73,7 @@ export function HoldingsClient({ canWrite }: { canWrite: boolean }) {
       fetchJson<HoldingLot>(`/api/investing/holdings/${lot.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...lot, ...edit, notes: edit.notes.trim() || null }),
+        body: JSON.stringify({ ...lot, ...edit, fee: edit.fee || 0, notes: edit.notes.trim() || null }),
       }),
     onSuccess: () => { setEditId(null); queryClient.invalidateQueries({ queryKey: ['holdings'] }) },
   })
@@ -98,7 +98,7 @@ export function HoldingsClient({ canWrite }: { canWrite: boolean }) {
 
   function startEdit(lot: HoldingLot) {
     setEditId(lot.id)
-    setEdit({ shares: String(num(lot.shares)), price: num(lot.price).toFixed(2), bought_on: lot.bought_on, notes: lot.notes ?? '' })
+    setEdit({ shares: String(num(lot.shares)), price: num(lot.price).toFixed(2), fee: num(lot.fee).toFixed(2), bought_on: lot.bought_on, notes: lot.notes ?? '' })
   }
 
   let totalCost = 0
@@ -194,6 +194,7 @@ export function HoldingsClient({ canWrite }: { canWrite: boolean }) {
                                   <th>Date</th>
                                   <th className="amount-col">Shares</th>
                                   <th className="amount-col">Price</th>
+                                  <th className="amount-col">Fee</th>
                                   <th className="amount-col">Cost</th>
                                   <th>Notes</th>
                                   {canWrite && <th></th>}
@@ -213,7 +214,10 @@ export function HoldingsClient({ canWrite }: { canWrite: boolean }) {
                                       <td className="amount-col">{editing
                                         ? <input type="text" inputMode="numeric" value={edit.price} onChange={(e) => setEdit({ ...edit, price: formatMoneyCents(e.target.value) })} />
                                         : money(num(lot.price))}</td>
-                                      <td className="amount-col">{money(num(lot.shares) * num(lot.price))}</td>
+                                      <td className="amount-col">{editing
+                                        ? <input type="text" inputMode="numeric" value={edit.fee} onChange={(e) => setEdit({ ...edit, fee: formatMoneyCents(e.target.value) })} />
+                                        : money(num(lot.fee))}</td>
+                                      <td className="amount-col">{money(num(lot.shares) * num(lot.price) + num(lot.fee))}</td>
                                       <td>{editing
                                         ? <input type="text" value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} />
                                         : lot.notes}</td>

@@ -52,14 +52,17 @@ export async function POST(req: NextRequest) {
         remaining -= lotMicro
       } else {
         await client.query(
-          `UPDATE holding_lots SET shares = $2, updated_at = NOW() WHERE id = $1`,
-          [lot.id, fromMicro(lotMicro - remaining)]
-        )
-        await client.query(
-          `INSERT INTO holding_lots (user_id, ticker, company_name, shares, price, bought_on, notes, sold_on, sale_price)
-           SELECT user_id, ticker, company_name, $2, price, bought_on, notes, $3, $4
+          `INSERT INTO holding_lots (user_id, ticker, company_name, shares, price, fee, bought_on, notes, sold_on, sale_price)
+           SELECT user_id, ticker, company_name, $2, price, ROUND(fee * $2::numeric / shares, 2), bought_on, notes, $3, $4
            FROM holding_lots WHERE id = $1`,
           [lot.id, fromMicro(remaining), d.sold_on, d.price]
+        )
+        // The sold piece took its pro-rata share of the fee; the remainder keeps the rest.
+        await client.query(
+          `UPDATE holding_lots
+           SET fee = fee - ROUND(fee * $3::numeric / shares, 2), shares = $2, updated_at = NOW()
+           WHERE id = $1`,
+          [lot.id, fromMicro(lotMicro - remaining), fromMicro(remaining)]
         )
         remaining = 0
       }
