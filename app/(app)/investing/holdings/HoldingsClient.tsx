@@ -4,6 +4,7 @@ import { Fragment, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BadgeDollarSign, Check, ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { Spinner } from '@/components/Spinner'
+import { Tooltip } from '@/components/Tooltip'
 import type { HoldingLot } from '@/lib/holdings'
 import { formatMoneyCents } from '@/lib/format'
 import { AddLotModal } from './AddLotModal'
@@ -175,9 +176,11 @@ export function HoldingsClient({ canWrite }: { canWrite: boolean }) {
                     <td className={`amount-col ${sign(gainPct)}`}>{pct(gainPct)}</td>
                     {canWrite && (
                       <td>
-                        <button className="icon-btn icon-btn--edit" onClick={() => openSell(p, price)} aria-label={`Sell ${p.ticker}`}>
-                          <BadgeDollarSign size={15} />
-                        </button>
+                        <Tooltip text={`Sell ${p.ticker} shares (oldest lots first)`}>
+                          <button className="icon-btn icon-btn--edit" onClick={() => openSell(p, price)} aria-label={`Sell ${p.ticker}`}>
+                            <BadgeDollarSign size={15} />
+                          </button>
+                        </Tooltip>
                       </td>
                     )}
                   </tr>

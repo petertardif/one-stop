@@ -23,7 +23,18 @@ export async function POST(req: NextRequest) {
   const parsed = sellSchema.safeParse(await req.json())
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   const d = parsed.data
-  let remaining = toMicro(d.shares)
+  const soldMicro = toMicro(d.shares)
+  let remaining = soldMicro
+  // Split the sale fee across the closed lots by shares, in whole cents; the last
+  // lot takes the rounding remainder so the pieces sum to the fee exactly.
+  const feeCents = BigInt(Math.round(d.fee * 100))
+  let feeLeft = feeCents
+  const feeFor = (pieceMicro: number) => {
+    const isLast = pieceMicro >= remaining
+    const cents = isLast ? feeLeft : (feeCents * BigInt(pieceMicro)) / BigInt(soldMicro)
+    feeLeft -= cents
+    return (Number(cents) / 100).toFixed(2)
+  }
 
   const client = await pool.connect()
   try {
@@ -46,16 +57,16 @@ export async function POST(req: NextRequest) {
       const lotMicro = toMicro(lot.shares)
       if (lotMicro <= remaining) {
         await client.query(
-          `UPDATE holding_lots SET sold_on = $2, sale_price = $3, updated_at = NOW() WHERE id = $1`,
-          [lot.id, d.sold_on, d.price]
+          `UPDATE holding_lots SET sold_on = $2, sale_price = $3, sale_fee = $4, updated_at = NOW() WHERE id = $1`,
+          [lot.id, d.sold_on, d.price, feeFor(lotMicro)]
         )
         remaining -= lotMicro
       } else {
         await client.query(
-          `INSERT INTO holding_lots (user_id, ticker, company_name, shares, price, fee, bought_on, notes, sold_on, sale_price)
-           SELECT user_id, ticker, company_name, $2, price, ROUND(fee * $2::numeric / shares, 2), bought_on, notes, $3, $4
+          `INSERT INTO holding_lots (user_id, ticker, company_name, shares, price, fee, bought_on, notes, sold_on, sale_price, sale_fee)
+           SELECT user_id, ticker, company_name, $2, price, ROUND(fee * $2::numeric / shares, 2), bought_on, notes, $3, $4, $5
            FROM holding_lots WHERE id = $1`,
-          [lot.id, fromMicro(remaining), d.sold_on, d.price]
+          [lot.id, fromMicro(remaining), d.sold_on, d.price, feeFor(remaining)]
         )
         // The sold piece took its pro-rata share of the fee; the remainder keeps the rest.
         await client.query(

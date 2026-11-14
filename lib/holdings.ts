@@ -23,15 +23,17 @@ export interface HoldingLot {
   notes: string | null
   sold_on: string | null
   sale_price: string | null
+  sale_fee: string
 }
 
 export const LOT_COLUMNS = `id, ticker, company_name, shares, price, fee, to_char(bought_on, 'YYYY-MM-DD') AS bought_on, notes,
-  to_char(sold_on, 'YYYY-MM-DD') AS sold_on, sale_price`
+  to_char(sold_on, 'YYYY-MM-DD') AS sold_on, sale_price, sale_fee`
 
 export const sellSchema = z.object({
   ticker: z.string().trim().transform((v) => v.toUpperCase()).pipe(z.string().regex(TICKER_RE)),
   shares: z.coerce.number().positive(),
   price: z.coerce.number().min(0),
+  fee: z.coerce.number().min(0).default(0),
   sold_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 })
 

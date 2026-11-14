@@ -33,7 +33,7 @@ export function SoldTable({ canWrite }: { canWrite: boolean }) {
   const rows = lots.map((lot) => {
     const shares = parseFloat(lot.shares)
     const cost = shares * parseFloat(lot.price) + parseFloat(lot.fee)
-    const proceeds = shares * parseFloat(lot.sale_price ?? '0')
+    const proceeds = shares * parseFloat(lot.sale_price ?? '0') - parseFloat(lot.sale_fee)
     return { lot, shares, cost, proceeds, gain: proceeds - cost }
   })
   const totalCost = rows.reduce((s, r) => s + r.cost, 0)

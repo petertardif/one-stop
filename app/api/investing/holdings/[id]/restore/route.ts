@@ -12,7 +12,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   if (!/^[0-9a-f-]{36}$/i.test(params.id)) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const result = await query(
-    `UPDATE holding_lots SET sold_on = NULL, sale_price = NULL, updated_at = NOW()
+    `UPDATE holding_lots SET sold_on = NULL, sale_price = NULL, sale_fee = 0, updated_at = NOW()
      WHERE id = $1 AND user_id = $2 AND sold_on IS NOT NULL`,
     [params.id, session.user.id]
   )

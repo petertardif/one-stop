@@ -19,13 +19,14 @@ function today() {
 
 export function SellModal({ dialogRef, target }: { dialogRef: RefObject<HTMLDialogElement>; target: SellTarget | null }) {
   const queryClient = useQueryClient()
-  const [form, setForm] = useState({ shares: '', price: '', sold_on: today() })
+  const [form, setForm] = useState({ shares: '', price: '', fee: '', sold_on: today() })
 
   useEffect(() => {
     if (!target) return
     setForm({
       shares: String(target.shares),
       price: target.price === null ? '' : target.price.toFixed(2),
+      fee: '',
       sold_on: today(),
     })
   }, [target])
@@ -35,7 +36,7 @@ export function SellModal({ dialogRef, target }: { dialogRef: RefObject<HTMLDial
       const res = await fetch('/api/investing/holdings/sell', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticker: target?.ticker, ...form }),
+        body: JSON.stringify({ ticker: target?.ticker, ...form, fee: form.fee || 0 }),
       })
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: unknown }
@@ -67,11 +68,15 @@ export function SellModal({ dialogRef, target }: { dialogRef: RefObject<HTMLDial
         <input type="text" inputMode="numeric" placeholder="0.00" value={form.price}
           onChange={(e) => setForm({ ...form, price: formatMoneyCents(e.target.value) })} />
       </ModalField>
+      <ModalField label="Fee">
+        <input type="text" inputMode="numeric" placeholder="0.00" value={form.fee}
+          onChange={(e) => setForm({ ...form, fee: formatMoneyCents(e.target.value) })} />
+      </ModalField>
       <ModalField label="Date sold">
         <input type="date" value={form.sold_on}
           onChange={(e) => setForm({ ...form, sold_on: e.target.value })} />
       </ModalField>
-      <p className="record-field--full text-muted">Oldest lots are sold first; a partly sold lot is split.</p>
+      <p className="record-field--full text-muted">Oldest lots are sold first; a partly sold lot is split. The fee is divided across the lots sold, by shares.</p>
       {sell.isError && <p className="record-field--full negative">{sell.error.message}</p>}
     </RecordModal>
   )
