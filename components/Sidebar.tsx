@@ -46,6 +46,7 @@ const FINANCIALS_SUB_ITEMS = [
 const INVESTING_SUB_ITEMS = [
   { label: 'Investments', href: '/investing/investments' },
   { label: 'Big 5 Calculator', href: '/investing/calculator' },
+  { label: 'Holdings', href: '/investing/holdings' },
   { label: 'Watchlist', href: '/investing/watchlist' },
   { label: 'Too Hard Pile', href: '/investing/too-hard' },
 ]

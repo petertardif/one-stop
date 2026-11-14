@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Trash2 } from 'lucide-react'
+import { ShoppingCart, Trash2 } from 'lucide-react'
+import { AddLotModal, LotPrefill } from '../holdings/AddLotModal'
 import { StatusBadge } from '@/components/investing/StatusBadge'
 import { Tooltip } from '@/components/Tooltip'
 import { useBusyWhile } from '@/components/BusyOverlay'
@@ -45,6 +46,20 @@ export function WatchlistClient({ initialRows, isAdmin }: { initialRows: Watchli
   const queryClient = useQueryClient()
   const [rows, setRows] = useState(initialRows)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const boughtRef = useRef<HTMLDialogElement>(null)
+  const [bought, setBought] = useState<LotPrefill | null>(null)
+
+  function openBought(row: WatchlistRow) {
+    setBought({ ticker: row.ticker, company_name: row.company_name })
+    // Let the modal reset to the new prefill before it shows.
+    requestAnimationFrame(() => boughtRef.current?.showModal())
+  }
+
+  // The lot API removed the watchlist entry in the same transaction.
+  function onBought(ticker: string) {
+    setRows((prev) => prev.filter((r) => r.ticker !== ticker))
+    setBought(null)
+  }
 
   // Deletes here use a raw fetch rather than a React Query mutation, so useIsMutating
   // never sees them and the overlay would not appear on its own.
@@ -72,6 +87,7 @@ export function WatchlistClient({ initialRows, isAdmin }: { initialRows: Watchli
   }
 
   return (
+    <>
     <table className="watchlist-table">
       <thead>
         <tr>
@@ -112,6 +128,11 @@ export function WatchlistClient({ initialRows, isAdmin }: { initialRows: Watchli
               </td>
               {isAdmin && (
                 <td>
+                  <Tooltip text="Bought: move to Holdings">
+                    <button className="btn-icon" onClick={() => openBought(row)}>
+                      <ShoppingCart size={16} />
+                    </button>
+                  </Tooltip>
                   <Tooltip text="Remove from watchlist">
                     <button
                       className="btn-icon btn-icon--danger"
@@ -128,6 +149,8 @@ export function WatchlistClient({ initialRows, isAdmin }: { initialRows: Watchli
         })}
       </tbody>
     </table>
+    {isAdmin && <AddLotModal dialogRef={boughtRef} prefill={bought} onSaved={onBought} />}
+    </>
   )
 }
 

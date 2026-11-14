@@ -363,10 +363,22 @@ Calculates intrinsic value using Phil Town's method:
 - User can override estimated growth rate (default: min of analyst estimate and historical EPS growth)
 - Displays: Sticker Price, MOS Price, current price vs. MOS (buy / wait / overvalued indicator)
 
+#### Holdings (`/investing/holdings`)
+
+Equities currently owned. Ally Invest has no usable API or Plaid feed, so holdings are **entered by hand** as purchase **lots** (`holding_lots`: ticker, company, shares, price/share, date bought, notes). Admin read/write; partner/dependent read-only.
+
+- **One row per ticker**: Shares (Σ) · Avg Cost (Σ cost ÷ Σ shares) · Cost Basis · Price · Market Value · Gain $ · Gain % (green/red), with a Totals footer. Expand a row to see its lots; admin can edit a lot inline or delete it.
+- **Prices** use the same endpoint and React Query cache key as the Watchlist (`/api/investing/fmp/[ticker]?data=price`); no extra API.
+- **Add lot** modal (`AddLotModal.tsx`, cash-register price entry; company auto-fills from the price lookup). The Watchlist's per-row **Bought** action opens the same modal pre-filled and, on save, removes the stock from the Watchlist in the same transaction.
+- **Open / Sold tabs.** Each Open position row has a **Sell** action (modal: shares — default all, sale price/share pre-filled with the current price, date). Sales close lots **oldest-first (FIFO)**; a partly sold lot is **split** into an open remainder and a sold piece with the same purchase details (share math done in whole micro-shares). The **Sold** tab lists one row per sold lot — Sold · Ticker · Company · Bought · Shares · Buy Price · Sale Price · Cost Basis · Proceeds · Gain $ · Gain % — with a realized-gain Totals footer; admin can **Undo sale** (lot returns to Open, not re-merged) or delete.
+
+**API routes:** `GET /api/investing/holdings[?status=sold]` · `POST /api/investing/holdings` (`{ ticker, company_name, shares, price, bought_on, notes?, from_watchlist? }`) · `PUT/DELETE /api/investing/holdings/[id]` · `POST /api/investing/holdings/sell` (`{ ticker, shares, price, sold_on }`, FIFO, transactional) · `POST /api/investing/holdings/[id]/restore` (undo a sale) — writes admin only.
+
 #### Watchlist (`/investing/watchlist`)
 
 - Table of tracked stocks: ticker, company name, current price, sticker price, MOS price, % to MOS, date added
 - Click a row to open the full analysis view for that stock
+- **Bought** (admin, per row) moves the stock to Holdings as a new lot
 - Status badge: **Buy** (price ≤ MOS), **Watch** (MOS < price ≤ Sticker), **Overvalued** (price > Sticker)
 - Sort/filter by status
 
@@ -506,6 +518,7 @@ charitable_donations id, user_id (FK), date, organization (nullable — recipien
 investments         id, user_id (FK), brokerage, type (nullable — Retirement|College|Savings, free-form), owner (nullable — "in whose name"), type_description (nullable), contribution_cadence (none|weekly|biweekly|monthly|annual), contribution_amount (numeric, nullable), contribution_note (nullable), strategy (nullable), sort_order (int — persisted manual drag order), liquidated_at (nullable — set = Liquidated tab), created_at, updated_at
 sec_companies       ticker (PK), cik (10-digit), name, fetched_at — cached SEC ticker→CIK map
 sec_annual_financials cik, fiscal_year, period_end, revenue, eps_diluted, equity, shares_outstanding, operating_cash_flow, capex, operating_income, income_tax, pretax_income, long_term_debt, short_term_debt, cash, accession, fetched_at — PK (cik, fiscal_year)
+holding_lots        id, user_id (FK), ticker, company_name, shares (numeric > 0), price (cost/share), bought_on (date), notes (nullable), sold_on (date, nullable — NULL = open), sale_price (nullable; set together with sold_on), created_at, updated_at — index (user_id, ticker)
 investment_snapshots id, investment_id (FK, cascade), as_of (date), value (numeric), created_at, updated_at — UNIQUE (investment_id, as_of)
 stocks              id, ticker, company_name, sector, created_at, updated_at
 watchlist_entries   id, user_id (FK), stock_id (FK), sticker_price, mos_price, growth_rate_used, big5_data (jsonb), added_at, updated_at
@@ -534,6 +547,7 @@ contacts            id, name, role, firm, phone, email, notes, created_at, updat
 /investing
 /investing/investments        (Investing submenu, first item — portfolio tracker w/ charts)
 /investing/calculator
+/investing/holdings           (owned equities — lots aggregated by ticker)
 /investing/watchlist
 /investing/watchlist/[ticker]
 /investing/too-hard
