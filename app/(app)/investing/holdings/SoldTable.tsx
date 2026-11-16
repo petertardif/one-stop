@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArchiveRestore, Trash2 } from 'lucide-react'
+import { ArchiveRestore, ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { Spinner } from '@/components/Spinner'
 import { RealizedChart, RealizedYear } from './HoldingsCharts'
 import { ColumnFilter } from '@/components/ColumnFilter'
+import { Tooltip } from '@/components/Tooltip'
+import { EditSoldModal } from './EditSoldModal'
 import type { HoldingLot } from '@/lib/holdings'
 
 const money = (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
@@ -42,13 +44,29 @@ async function send(url: string, method: string) {
   if (!res.ok) throw new Error(`Request failed: ${res.status}`)
 }
 
-/** Sold tab: one row per sold lot with its realized gain. */
+/** Sold tab: one row per ticker (summing its sold lots), expandable to the lots themselves. */
 export function SoldTable({ canWrite }: { canWrite: boolean }) {
   const queryClient = useQueryClient()
   const [rates, setRates] = useState(DEFAULT_RATES)
   const [years, setYears] = useState<string[]>([])
   const [tickers, setTickers] = useState<string[]>([])
   const [companies, setCompanies] = useState<string[]>([])
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const editRef = useRef<HTMLDialogElement>(null)
+  const [editing, setEditing] = useState<HoldingLot | null>(null)
+
+  function toggle(ticker: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(ticker)) next.delete(ticker); else next.add(ticker)
+      return next
+    })
+  }
+
+  function openEdit(lot: HoldingLot) {
+    setEditing(lot)
+    requestAnimationFrame(() => editRef.current?.showModal())
+  }
 
   useEffect(() => {
     try {
@@ -109,6 +127,36 @@ export function SoldTable({ canWrite }: { canWrite: boolean }) {
     return { year, short: t.netShort, long: t.netLong, tax: t.tax }
   })
 
+  // One group per ticker; Est. Tax nets the ticker's lots like the totals row does.
+  const groupMap = new Map<string, typeof rows>()
+  for (const row of rows) groupMap.set(row.lot.ticker, [...(groupMap.get(row.lot.ticker) ?? []), row])
+  const groups = Array.from(groupMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([ticker, lotRows]) => {
+      const t = estimateTax(lotRows, rateOf(false), rateOf(true))
+      const dates = lotRows.map((x) => x.lot.sold_on ?? '').sort()
+      return {
+        ticker,
+        company: lotRows[0].lot.company_name,
+        lotRows,
+        sold: dates[0] === dates[dates.length - 1] ? dates[0] : `${dates[0]} – ${dates[dates.length - 1]}`,
+        shares: lotRows.reduce((sum, x) => sum + x.shares, 0),
+        cost: lotRows.reduce((sum, x) => sum + x.cost, 0),
+        proceeds: lotRows.reduce((sum, x) => sum + x.proceeds, 0),
+        hasShort: lotRows.some((x) => !x.long),
+        hasLong: lotRows.some((x) => x.long),
+        netShort: t.netShort,
+        netLong: t.netLong,
+        tax: t.tax,
+      }
+    })
+
+  // Term cell: the gain split by term, e.g. "S $120.00 / L $300.00".
+  const termSplit = (g: (typeof groups)[number]) =>
+    [g.hasShort ? `S ${money(g.netShort)}` : null, g.hasLong ? `L ${money(g.netLong)}` : null].filter(Boolean).join(' / ')
+  const fmtShares = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 6 })
+  const colCount = 11
+
   if (isLoading) return <Spinner />
 
   return (
@@ -125,6 +173,7 @@ export function SoldTable({ canWrite }: { canWrite: boolean }) {
       <table className="ledger-table">
         <thead>
           <tr>
+            <th></th>
             <th>
               <ColumnFilter label="Sold" mode="multi" allLabel="All Years" options={yearOptions}
                 selected={years} onChange={setYears} summary={years.length ? years.join(', ') : null} />
@@ -139,67 +188,128 @@ export function SoldTable({ canWrite }: { canWrite: boolean }) {
             </th>
             <th>Term</th>
             <th className="amount-col">Est. Tax</th>
-            <th>Bought</th>
             <th className="amount-col">Shares</th>
-            <th className="amount-col">Buy Price</th>
-            <th className="amount-col">Sale Price</th>
             <th className="amount-col">Cost Basis</th>
             <th className="amount-col">Proceeds</th>
             <th className="amount-col">Gain $</th>
             <th className="amount-col">Gain %</th>
-            {canWrite && <th></th>}
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ lot, shares, cost, proceeds, gain, long, tax }) => (
-            <tr key={lot.id}>
-              <td>{lot.sold_on}</td>
-              <td><strong>{lot.ticker}</strong></td>
-              <td>{lot.company_name}</td>
-              <td>{long ? 'Long' : 'Short'}</td>
-              <td className="amount-col">{money(tax)}</td>
-              <td>{lot.bought_on}</td>
-              <td className="amount-col">{shares.toLocaleString('en-US', { maximumFractionDigits: 6 })}</td>
-              <td className="amount-col">{money(parseFloat(lot.price))}</td>
-              <td className="amount-col">{money(parseFloat(lot.sale_price ?? '0'))}</td>
-              <td className="amount-col">{money(cost)}</td>
-              <td className="amount-col">{money(proceeds)}</td>
-              <td className={`amount-col ${sign(gain)}`}>{money(gain)}</td>
-              <td className={`amount-col ${sign(gain)}`}>{pct(cost ? gain / cost : null)}</td>
-              {canWrite && (
-                <td>
-                  <button className="icon-btn icon-btn--edit" aria-label="Undo sale" disabled={restore.isPending}
-                    onClick={() => { if (confirm(`Undo this ${lot.ticker} sale? The lot goes back to Open.`)) restore.mutate(lot.id) }}>
-                    <ArchiveRestore size={15} />
-                  </button>
-                  <button className="icon-btn icon-btn--delete" aria-label="Delete lot" disabled={remove.isPending}
-                    onClick={() => { if (confirm(`Permanently delete this sold ${lot.ticker} lot?`)) remove.mutate(lot.id) }}>
-                    <Trash2 size={15} />
-                  </button>
-                </td>
-              )}
-            </tr>
-          ))}
-          {rows.length === 0 && (
-            <tr><td colSpan={canWrite ? 14 : 13} className="col-center">{lots.length ? 'No sales match these filters.' : 'No sales yet.'}</td></tr>
+          {groups.map((g) => {
+            const open = expanded.has(g.ticker)
+            const gain = g.proceeds - g.cost
+            return (
+              <Fragment key={g.ticker}>
+                <tr>
+                  <td>
+                    <button className="icon-btn inv-expand" onClick={() => toggle(g.ticker)}
+                      aria-label={open ? 'Collapse' : 'Expand'} aria-expanded={open}>
+                      {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </button>
+                  </td>
+                  <td>{g.sold}</td>
+                  <td><strong>{g.ticker}</strong></td>
+                  <td>{g.company}</td>
+                  <td>{termSplit(g)}</td>
+                  <td className="amount-col">{money(g.tax)}</td>
+                  <td className="amount-col">{fmtShares(g.shares)}</td>
+                  <td className="amount-col">{money(g.cost)}</td>
+                  <td className="amount-col">{money(g.proceeds)}</td>
+                  <td className={`amount-col ${sign(gain)}`}>{money(gain)}</td>
+                  <td className={`amount-col ${sign(gain)}`}>{pct(g.cost ? gain / g.cost : null)}</td>
+                </tr>
+                {open && (
+                  <tr className="inv-detail-row">
+                    <td></td>
+                    <td colSpan={colCount - 1}>
+                      <div className="inv-detail">
+                        <div className="inv-detail-history">
+                          <h3>Sold lots</h3>
+                          <table className="inv-history-table">
+                            <thead>
+                              <tr>
+                                <th>Sold</th>
+                                <th>Bought</th>
+                                <th>Term</th>
+                                <th className="amount-col">Shares</th>
+                                <th className="amount-col">Buy Price</th>
+                                <th className="amount-col">Fee</th>
+                                <th className="amount-col">Sale Price</th>
+                                <th className="amount-col">Sale Fee</th>
+                                <th className="amount-col">Gain $</th>
+                                <th className="amount-col">Est. Tax</th>
+                                <th>Notes</th>
+                                {canWrite && <th></th>}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {g.lotRows.map(({ lot, shares, gain: lotGain, long, tax }) => (
+                                <tr key={lot.id}>
+                                  <td>{lot.sold_on}</td>
+                                  <td>{lot.bought_on}</td>
+                                  <td>{long ? 'Long' : 'Short'}</td>
+                                  <td className="amount-col">{fmtShares(shares)}</td>
+                                  <td className="amount-col">{money(parseFloat(lot.price))}</td>
+                                  <td className="amount-col">{money(parseFloat(lot.fee))}</td>
+                                  <td className="amount-col">{money(parseFloat(lot.sale_price ?? '0'))}</td>
+                                  <td className="amount-col">{money(parseFloat(lot.sale_fee))}</td>
+                                  <td className={`amount-col ${sign(lotGain)}`}>{money(lotGain)}</td>
+                                  <td className="amount-col">{money(tax)}</td>
+                                  <td>{lot.notes}</td>
+                                  {canWrite && (
+                                    <td>
+                                      <Tooltip text="Edit this sold lot">
+                                        <button className="icon-btn icon-btn--edit" aria-label="Edit sold lot" onClick={() => openEdit(lot)}>
+                                          <Pencil size={15} />
+                                        </button>
+                                      </Tooltip>
+                                      <Tooltip text="Undo sale: move back to Open">
+                                        <button className="icon-btn icon-btn--edit" aria-label="Undo sale" disabled={restore.isPending}
+                                          onClick={() => { if (confirm(`Undo this ${lot.ticker} sale? The lot goes back to Open.`)) restore.mutate(lot.id) }}>
+                                          <ArchiveRestore size={15} />
+                                        </button>
+                                      </Tooltip>
+                                      <Tooltip text="Delete this lot permanently">
+                                        <button className="icon-btn icon-btn--delete" aria-label="Delete lot" disabled={remove.isPending}
+                                          onClick={() => { if (confirm(`Permanently delete this sold ${lot.ticker} lot?`)) remove.mutate(lot.id) }}>
+                                          <Trash2 size={15} />
+                                        </button>
+                                      </Tooltip>
+                                    </td>
+                                  )}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            )
+          })}
+          {groups.length === 0 && (
+            <tr><td colSpan={colCount} className="col-center">{lots.length ? 'No sales match these filters.' : 'No sales yet.'}</td></tr>
           )}
         </tbody>
-        {rows.length > 0 && (
+        {groups.length > 0 && (
           <tfoot>
             <tr className="budget-total-row">
-              <td>Total</td><td></td><td></td><td></td>
+              <td></td><td>Total</td><td></td><td></td><td></td>
               <td className="amount-col">{money(totalTax)}</td>
-              <td></td><td></td><td></td><td></td>
+              <td></td>
               <td className="amount-col">{money(totalCost)}</td>
               <td className="amount-col">{money(totalProceeds)}</td>
               <td className={`amount-col ${sign(totalGain)}`}>{money(totalGain)}</td>
               <td className={`amount-col ${sign(totalGain)}`}>{pct(totalCost ? totalGain / totalCost : null)}</td>
-              {canWrite && <td></td>}
             </tr>
           </tfoot>
         )}
       </table>
     </div>
+    {canWrite && <EditSoldModal dialogRef={editRef} lot={editing} />}
     </>
   )
 }

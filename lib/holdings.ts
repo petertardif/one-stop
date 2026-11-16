@@ -40,3 +40,12 @@ export const sellSchema = z.object({
 /** Shares are NUMERIC(18,6); do sale arithmetic in whole micro-shares to avoid float drift. */
 export const toMicro = (v: number | string) => Math.round(Number(v) * 1e6)
 export const fromMicro = (v: number) => (v / 1e6).toFixed(6)
+
+/** Editing a sold lot: every purchase field plus the sale fields. */
+export const soldLotSchema = lotSchema
+  .extend({
+    sold_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    sale_price: z.coerce.number().min(0),
+    sale_fee: z.coerce.number().min(0).default(0),
+  })
+  .refine((d) => d.sold_on >= d.bought_on, { message: 'Date sold cannot be before date bought', path: ['sold_on'] })
