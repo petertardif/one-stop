@@ -137,6 +137,8 @@ export function SoldTable({ canWrite }: { canWrite: boolean }) {
               <ColumnFilter label="Company" mode="multi" allLabel="All Companies" options={companyOptions}
                 selected={companies} onChange={setCompanies} summary={companies.length ? String(companies.length) : null} />
             </th>
+            <th>Term</th>
+            <th className="amount-col">Est. Tax</th>
             <th>Bought</th>
             <th className="amount-col">Shares</th>
             <th className="amount-col">Buy Price</th>
@@ -145,8 +147,6 @@ export function SoldTable({ canWrite }: { canWrite: boolean }) {
             <th className="amount-col">Proceeds</th>
             <th className="amount-col">Gain $</th>
             <th className="amount-col">Gain %</th>
-            <th>Term</th>
-            <th className="amount-col">Est. Tax</th>
             {canWrite && <th></th>}
           </tr>
         </thead>
@@ -156,6 +156,8 @@ export function SoldTable({ canWrite }: { canWrite: boolean }) {
               <td>{lot.sold_on}</td>
               <td><strong>{lot.ticker}</strong></td>
               <td>{lot.company_name}</td>
+              <td>{long ? 'Long' : 'Short'}</td>
+              <td className="amount-col">{money(tax)}</td>
               <td>{lot.bought_on}</td>
               <td className="amount-col">{shares.toLocaleString('en-US', { maximumFractionDigits: 6 })}</td>
               <td className="amount-col">{money(parseFloat(lot.price))}</td>
@@ -164,8 +166,6 @@ export function SoldTable({ canWrite }: { canWrite: boolean }) {
               <td className="amount-col">{money(proceeds)}</td>
               <td className={`amount-col ${sign(gain)}`}>{money(gain)}</td>
               <td className={`amount-col ${sign(gain)}`}>{pct(cost ? gain / cost : null)}</td>
-              <td>{long ? 'Long' : 'Short'}</td>
-              <td className="amount-col">{money(tax)}</td>
               {canWrite && (
                 <td>
                   <button className="icon-btn icon-btn--edit" aria-label="Undo sale" disabled={restore.isPending}
@@ -187,13 +187,13 @@ export function SoldTable({ canWrite }: { canWrite: boolean }) {
         {rows.length > 0 && (
           <tfoot>
             <tr className="budget-total-row">
-              <td>Total</td><td></td><td></td><td></td><td></td><td></td><td></td>
+              <td>Total</td><td></td><td></td><td></td>
+              <td className="amount-col">{money(totalTax)}</td>
+              <td></td><td></td><td></td><td></td>
               <td className="amount-col">{money(totalCost)}</td>
               <td className="amount-col">{money(totalProceeds)}</td>
               <td className={`amount-col ${sign(totalGain)}`}>{money(totalGain)}</td>
               <td className={`amount-col ${sign(totalGain)}`}>{pct(totalCost ? totalGain / totalCost : null)}</td>
-              <td></td>
-              <td className="amount-col">{money(totalTax)}</td>
               {canWrite && <td></td>}
             </tr>
           </tfoot>
