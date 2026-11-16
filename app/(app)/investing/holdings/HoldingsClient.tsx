@@ -8,6 +8,7 @@ import { Tooltip } from '@/components/Tooltip'
 import type { HoldingLot } from '@/lib/holdings'
 import { formatMoneyCents } from '@/lib/format'
 import { AddLotModal } from './AddLotModal'
+import { HoldingsCharts } from './HoldingsCharts'
 import { SellModal, SellTarget } from './SellModal'
 import { SoldTable } from './SoldTable'
 
@@ -131,6 +132,10 @@ export function HoldingsClient({ canWrite }: { canWrite: boolean }) {
 
       {tab === 'sold' ? <SoldTable canWrite={canWrite} /> : <>
       {isLoading && <Spinner />}
+      <HoldingsCharts positions={positions.map((p, i) => {
+        const price = priceOf(i)
+        return { ticker: p.ticker, cost: p.cost, value: price === null ? null : price * p.shares }
+      })} />
 
       <div className="ledger-table-wrap">
         <table className="ledger-table">

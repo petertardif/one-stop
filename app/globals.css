@@ -3917,3 +3917,21 @@ p, h1, h2, h3, h4, h5, h6 {
 .chart-legend__more { color: var(--text-muted); cursor: default; }
 
 .calculator__source { margin-top: 6px; font-size: var(--font-size-sm); color: var(--text-muted); }
+
+/* Holdings Sold tab: editable capital-gains tax rates */
+.holdings-tax-rates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+  font-size: 0.875rem;
+}
+.holdings-tax-rates label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.holdings-tax-rates input {
+  width: 4.5rem;
+}
